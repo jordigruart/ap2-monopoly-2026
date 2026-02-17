@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from tile import Property
+import const
 
 if TYPE_CHECKING:
   from board import Board
@@ -21,7 +22,15 @@ class Player:
     piece: str,
     color: str,
     index: int,
-  ): ...
+  ):
+    self._board = board
+    self._name = name
+    self._piece = piece
+    self._color = color
+    self._index = index 
+
+    self._position = 0
+    self._money = const.START_MONEY
 
   def board(self) -> Board:
     return self._board

@@ -15,17 +15,22 @@ class Tile:
     name: str,
     tile_type: str,
     description: str,
-  ): ...
+  ):
+    self._board = board
+    self._position = position
+    self._name = name
+    self._tile_type = tile_type
+    self._description = description
 
   def land_on(self, player: Player) -> None:
-    """Handle what happens when a player lands on this tile."""
+    '''Handle what happens when a player lands on this tile. To be implemented in subclass.'''
     pass
 
-  def type(self) -> str: ...
-  def name(self) -> str: ...
-  def description(self) -> str: ...
-  def position(self) -> int: ...
-  def board(self) -> Board: ...
+  def type(self) -> str: return self._tile_type
+  def name(self) -> str: return self._name
+  def description(self) -> str: return self._description
+  def position(self) -> int: return self._position
+  def board(self) -> Board: return self._board
 
 class Property(Tile):
   def __init__(
@@ -65,4 +70,7 @@ class Street(Property):
 # more subclasses
 ...
 
-def build_tile(board: Board, data: dict[str, Any]) -> Tile: ...
+def build_tile(board: Board, data: dict[str, Any]) -> Tile:
+  return Tile(
+    board, data.get('position', 0), data.get('name', ''), data.get('type', 'default'), data.get('description', '')
+  )
