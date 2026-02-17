@@ -135,7 +135,7 @@ def main() -> None:
     page = sys.argv[1]
     svgs = sys.argv[2:]
     html = generate_slideshow(svgs)
-    with open(page, "w") as f:
+    with open(page, "w", encoding = 'UTF-8') as f:
         f.write(html)
 
 
