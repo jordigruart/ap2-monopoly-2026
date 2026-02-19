@@ -13,8 +13,8 @@ def generate_slideshow(svgs: list[str]) -> str:
         return "<html><body><p>No SVGs to display</p></body></html>"
 
     # Escape SVG paths for JavaScript
-    escaped_paths = [path.replace("\\", "\\\\").replace("'", "\\'") for path in svgs]
-    paths_js = "[" + ", ".join(f"'{path}'" for path in escaped_paths) + "]"
+    escaped_paths = [path.replace("\\", "\\\\").replace("'", '') for path in svgs]
+    paths_js = "[\'imgs/" + ", \'imgs/".join(f"{path}'" for path in escaped_paths) + "]"
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -137,7 +137,6 @@ def main() -> None:
     html = generate_slideshow(svgs)
     with open(page, "w", encoding = 'UTF-8') as f:
         f.write(html)
-
 
 if __name__ == "__main__":
     main()

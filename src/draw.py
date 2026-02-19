@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import drawsvg as dw
-from board import Board
 from tile import Tile
 
+if TYPE_CHECKING:
+  from board import Board
 
 # Board dimensions: 1000x1000 total; player info in four quadrants at center
 BOARD_SIZE = 1000

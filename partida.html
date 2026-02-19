@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="container">
-        <img id="svg-display" src="imgs/tauler-0.svg" alt="SVG Image">
+        <img id="svg-display" src="turn-0001-a.svg" alt="SVG Image">
         <div class="controls">
             <button id="btn-first" onclick="goToFirst()">⏮️</button>
             <button id="btn-prev" onclick="goToPrev()">⬅️</button>
@@ -58,12 +58,12 @@
             <button id="btn-last" onclick="goToLast()">⏭️</button>
         </div>
         <div class="info">
-            <span id="current-info">1 / 1</span>
+            <span id="current-info">1 / 32</span>
         </div>
     </div>
     
     <script>
-        const svgPaths = ['imgs/tauler-0.svg'];
+        const svgPaths = ['imgs/turn-0001-a.svg', 'imgs/turn-0001-b.svg', 'imgs/turn-0002-a.svg', 'imgs/turn-0002-b.svg', 'imgs/turn-0003-a.svg', 'imgs/turn-0003-b.svg', 'imgs/turn-0004-a.svg', 'imgs/turn-0004-b.svg', 'imgs/turn-0005-a.svg', 'imgs/turn-0005-b.svg', 'imgs/turn-0006-a.svg', 'imgs/turn-0006-b.svg', 'imgs/turn-0007-a.svg', 'imgs/turn-0007-b.svg', 'imgs/turn-0008-a.svg', 'imgs/turn-0008-b.svg', 'imgs/turn-0009-a.svg', 'imgs/turn-0009-b.svg', 'imgs/turn-0010-a.svg', 'imgs/turn-0010-b.svg', 'imgs/turn-0011-a.svg', 'imgs/turn-0011-b.svg', 'imgs/turn-0012-a.svg', 'imgs/turn-0012-b.svg', 'imgs/turn-0013-a.svg', 'imgs/turn-0013-b.svg', 'imgs/turn-0014-a.svg', 'imgs/turn-0014-b.svg', 'imgs/turn-0015-a.svg', 'imgs/turn-0015-b.svg', 'imgs/turn-0016-a.svg', 'imgs/turn-0016-b.svg'];
         let currentIndex = 0;
         
         function updateDisplay() {

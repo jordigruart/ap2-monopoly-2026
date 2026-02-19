@@ -1,5 +1,4 @@
 from board import Board
-from draw import draw
 import random
 
 def main() -> None:
@@ -11,9 +10,7 @@ def main() -> None:
   )
 
   random.seed(25)
-  
   board.play()
-  draw(board, 'imgs/tauler-0.svg')
 
 if __name__ == "__main__":
   main()
