@@ -32,33 +32,20 @@ class Player:
     self._position = 0
     self._money = const.START_MONEY
 
-  def board(self) -> Board:
-    return self._board
+  def board(self) -> Board: return self._board
+  def name(self) -> str: return self._name
+  def piece(self) -> str: return self._piece
+  def color(self) -> str: return self._color
+  def index(self) -> int: return self._index
 
-  def name(self) -> str:
-    return self._name
-
-  def piece(self) -> str:
-    return self._piece
-
-  def color(self) -> str:
-    return self._color
-
-  def index(self) -> int:
-    return self._index
+  def money(self) -> int: return self._money
+  def position(self) -> int: return self._position
 
   def broke(self) -> bool:
-    """Return True if the player has negative money."""
+    '''Return True if the player has negative money.'''
     return self._money < 0
 
-  def money(self) -> int:
-    return self._money
-
-  def position(self) -> int:
-    return self._position
-
-  def get_out_of_jail_free_cards(self) -> int:
-    return 0
+  def get_out_of_jail_free_cards(self) -> int: return 0
 
   def turns_in_prison(self) -> int:
     return 0
