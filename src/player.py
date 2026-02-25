@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from tile import Property
+from tile import Street, Station, Utility, Property
 import const
 
 if TYPE_CHECKING:
@@ -32,27 +32,54 @@ class Player:
     self._position = 0
     self._money = const.START_MONEY
 
+    self._streets = set[Street]()
+    self._stations = set[Station]()
+    self._utilities = set[Utility]()
+
   def board(self) -> Board: return self._board
   def name(self) -> str: return self._name
   def piece(self) -> str: return self._piece
   def color(self) -> str: return self._color
   def index(self) -> int: return self._index
 
-  def money(self) -> int: return self._money
   def position(self) -> int: return self._position
 
-  def broke(self) -> bool:
-    '''Return True if the player has negative money.'''
-    return self._money < 0
+  def balance(self) -> int: return self._money
+  def owned_properties(self) -> set[Property]:
+    return self._streets | self._stations | self._utilities # type: ignore
 
-  def get_out_of_jail_free_cards(self) -> int: return 0
-
-  def turns_in_prison(self) -> int:
-    return 0
-
-  def owned_properties(self) -> list[Property]:
-    return []
+  def owns(self, property: Property) -> bool:
+    '''Returns whether the player owns the specified property.'''
+    return property.owner() == self
   
+  def owns_color(self, color: str) -> bool:
+    '''Returns whether the player owns every property in the specified color
+    set.'''
+    return all(self.owns(property) for property in self.board().color(color))
+
+  def is_bankrupt(self) -> bool: return self._money < 0
+  
+  def get_out_of_jail_free_cards(self) -> int: return 0
+  def turns_in_prison(self) -> int: return 0
+
+  def can_play(self) -> bool: return True
+
+  def station_count(self) -> int:
+    '''Returns how many stations are currently in this player's posession.'''
+    return len(self._stations)
+  
+  def utility_count(self) -> int:
+    '''Returns how many utilities are currently in this player's posession.'''
+    return len(self._utilities)
+
+  def entrust(self, increment: int) -> None:
+    '''Increments the player's balance by the specified amount.'''
+    self._money += increment
+
+  def deduct(self, decrement: int) -> None:
+    '''Decrements the player's balance by the specified amount.'''
+    self._money -= decrement
+
   def move_forward(self, increment: int, go_bonus: bool = True) -> None:
     '''Moves player forward by the increment.
     
@@ -81,12 +108,22 @@ class Player:
     if go_bonus and position <= self._position: self._money += const.GO_SALARY
     self._position = position
   
-  def imprison(self) -> None: 
-    '''Sends player to jail. Does not apply GO bonus.'''
-    self.set_position(self._board.jail_position(), False)
-  
-  def can_play(self) -> bool: return True
+  def buy(self, property: Property):
+    self.deduct(property.price())
 
+    match property.tile_type():
+      case 'property': self._streets.add(property)    # type: ignore
+      case 'station': self._stations.add(property)    # type: ignore
+      case 'utility': self._utilities.add(property)   # type: ignore
+      case _: raise
+  
+  def is_in_prison(self) -> bool: return self._in_prison
+
+  def imprison(self) -> None: 
+    '''Sends player to jail and updates corresponding. Does not apply GO bonus.'''
+    self.set_position(self._board.jail_position(), False)
+    self._in_prison = True
+    
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
   """Build a Player from JSON-like dict with 'name', 'piece', and 'color' keys."""
   return Player(board, data["name"], data["piece"], data["color"], index)

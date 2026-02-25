@@ -124,14 +124,14 @@
 <rect x="909.0909090909091" y="818.1818181818181" width="90.9090909090909" height="90.9090909090909" fill="#7070D0" stroke="black" stroke-width="1" />
 <path d="M909.0909090909091,840.9090909090909 L1000.0,840.9090909090909" stroke="black" stroke-width="1" />
 <text x="954.5454545454546" y="863.6363636363636" font-size="11" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">Mayfair £400</text>
-<circle cx="772.7272727272727" cy="45.45454545454545" r="16" fill="LightCoral" stroke="black" stroke-width="2" />
-<text x="772.7272727272727" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🚘</text>
-<circle cx="227.27272727272725" cy="45.45454545454545" r="16" fill="LightBlue" stroke="black" stroke-width="2" />
-<text x="227.27272727272725" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🐧</text>
-<circle cx="318.1818181818182" cy="45.45454545454545" r="16" fill="Silver" stroke="black" stroke-width="2" />
-<text x="318.1818181818182" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🛩</text>
-<circle cx="45.45454545454545" cy="954.5454545454546" r="16" fill="Gold" stroke="black" stroke-width="2" />
-<text x="45.45454545454545" y="954.5454545454546" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🐈</text>
+<circle cx="954.5454545454546" cy="681.8181818181819" r="16" fill="LightCoral" stroke="black" stroke-width="2" />
+<text x="954.5454545454546" y="681.8181818181819" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🚘</text>
+<circle cx="863.6363636363636" cy="45.45454545454545" r="16" fill="LightBlue" stroke="black" stroke-width="2" />
+<text x="863.6363636363636" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🐧</text>
+<circle cx="954.5454545454545" cy="45.45454545454545" r="16" fill="Silver" stroke="black" stroke-width="2" />
+<text x="954.5454545454545" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🛩</text>
+<circle cx="772.7272727272727" cy="45.45454545454545" r="16" fill="Gold" stroke="black" stroke-width="2" />
+<text x="772.7272727272727" y="45.45454545454545" font-size="18" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🐈</text>
 <text x="500.0" y="508.0" font-size="60" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">🤑</text>
 <rect x="140.9090909090909" y="140.9090909090909" width="334.0909090909091" height="334.0909090909091" fill="LightCoral" stroke="black" stroke-width="1" />
 <text x="148.9090909090909" y="162.9090909090909" font-size="20" font-weight="bold" font-family="Helvetica">🚘 Jordi</text>
@@ -146,6 +146,6 @@
 <text x="148.9090909090909" y="547.0" font-size="20" font-weight="bold" font-family="Helvetica">🐈 Marta</text>
 <text x="148.9090909090909" y="561.0" font-size="14" font-family="Helvetica">💵 £1300 · 💳 0 · ⛓️ 0</text>
 <text x="365.0" y="813.0909090909091" font-size="72" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">⚂</text>
-<text x="429.0" y="813.0909090909091" font-size="72" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">⚄</text>
+<text x="429.0" y="813.0909090909091" font-size="72" text-anchor="middle" dominant-baseline="middle" font-family="Helvetica">⚃</text>
 </g>
 </svg>

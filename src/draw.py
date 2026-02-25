@@ -195,7 +195,7 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
         words = tile.name().split()
         if not words:
             words = [tile.name()]
-        price = getattr(tile, "price", None)
+        price = getattr(tile, "_price", None)
         if tile.tile_type() in ("property", "station", "utility") and price is not None:
             words.append(f"£{price}")
         cx, cy = x + w / 2, y + h / 2
@@ -465,7 +465,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
         )
         ty += line_h
         info_parts = [
-            f"💵 £{player.money()}",
+            f"💵 £{player.balance()}",
             f"💳 {player.get_out_of_jail_free_cards()}",
             f"⛓️ {player.turns_in_prison()}",
         ]
