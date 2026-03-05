@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from tile import Street, Station, Utility, Property
-import const
+import const, random
 
 if TYPE_CHECKING:
   from board import Board
@@ -76,9 +76,11 @@ class Player:
     '''Increments the player's balance by the specified amount.'''
     self._money += increment
 
-  def deduct(self, decrement: int) -> None:
-    '''Decrements the player's balance by the specified amount.'''
+  def deduct(self, decrement: int) -> int:
+    '''Decrements the player's balance by the specified amount and returns the
+    amount deducted.'''
     self._money -= decrement
+    return decrement
 
   def move_forward(self, increment: int, go_bonus: bool = True) -> None:
     '''Moves player forward by the increment.
@@ -117,12 +119,22 @@ class Player:
       case 'utility': self._utilities.add(property)   # type: ignore
       case _: raise
   
+  def prompt_buy(self, property: Property):
+    if random.randint(0, 1): self.buy(property)
+  
+  def prompt_mortgage(self) -> None: pass
+
   def is_in_prison(self) -> bool: return self._in_prison
 
   def imprison(self) -> None: 
     '''Sends player to jail and updates corresponding. Does not apply GO bonus.'''
     self.set_position(self._board.jail_position(), False)
     self._in_prison = True
+  
+  def eliminate(self) -> None:
+    '''Eliminates self from play.'''
+    for property in self.owned_properties(): property.reset()
+    for attr in self._streets, self._stations, self._utilities: attr.clear()
     
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
   """Build a Player from JSON-like dict with 'name', 'piece', and 'color' keys."""

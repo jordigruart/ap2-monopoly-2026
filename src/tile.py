@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Optional
+import const
 
 if TYPE_CHECKING:
   from board import Board
@@ -30,7 +31,7 @@ class Tile:
     default. Behaviour may be modified in inheritance class.
     
     Note: GO bonus already handled by player.py's movement methods.'''
-    if 'Go to Jail' in self.name(): player.imprison()
+    if 'Go To Jail' in self.name(): player.imprison()
     else: pass 
 
 class Tax(Tile):
@@ -57,6 +58,9 @@ class Property(Tile):
   _price: int
   _mortgage: int
 
+  _owner: Optional[Player]
+  _is_mortgaged: bool
+
   def __init__(self, board: Board, position: int, name: str,
     price: int, mortgage: int):
     super().__init__(board, position, name)
@@ -64,28 +68,60 @@ class Property(Tile):
     self._price = price
     self._mortgage = mortgage
 
-    self._owner: Optional[Player] = None
+    self._owner = None
     self._tile_type = 'property'
 
+    self._is_mortgaged = True
+
   def price(self) -> int: return self._price
-  def mortgage(self) -> int: return self._mortgage
+  def is_mortgaged(self) -> bool: return self._is_mortgaged
   
   def has_owner(self) -> bool:
     '''Returns whether the property is in somebody's possession.'''
     return self._owner is not None
   
   def owner(self) -> Optional[Player]:
-    '''Returns the owner of the property.'''
+    '''Returns the owner of the property, or None if it is not owned.'''
     return self._owner
   
   def rent(self) -> int:
     '''Returns the rent to be charged considering the current state of the
-    board. To be inclemented in inheritance class.'''
+    board.'''
+    # to be implemented in subclass
     raise NotImplementedError
+
+  def reset(self) -> None:
+    '''Resets property so that it may be claimed again. The previous owner
+    gets no money from this operation.'''
+    self._is_mortgaged = False
+    self._owner = None
   
   def land_on(self, player: Player) -> None:
-    if self.has_owner() and not player.owns(self): player.deduct(self.rent())
+    if self.has_owner():
+      if not self.is_mortgaged() and not player.owns(self):
+        self.owner().entrust(player.deduct(self.rent()))
+
+    else:
+      player.prompt_buy(self)
+
+  def mortgage(self):
+    '''Mortgages tile, granting its owner the tile's corresponding mortgage
+    bonus, which is half its price by definition.
     
+    If the tile is a street, there must be no houses or hotels on the tile in
+    order to be mortgaged.'''
+    assert self.has_owner()
+    assert not self.is_mortgaged()
+    self._is_mortgaged = True
+    self.owner().entrust(self._mortgage)
+  
+  def demortgage(self):
+    '''Demortgages tile and deducts 110% of its mortgage fee from its owner.'''
+    assert self.has_owner()
+    assert self.is_mortgaged()
+    self._is_mortgaged = False
+    self.owner().deduct(int(self._mortgage * const.MORTGAGE_INTEREST_RATE))
+
 class Street(Property):
   _starting_rent: int
   _rent_with_color_set: int
@@ -124,26 +160,103 @@ class Street(Property):
     self._house_cost = house_cost 
     self._hotel_cost = hotel_cost 
 
-    self._houses = 0
+    self._houses = 0 # amount of houses on property; 5 with whotel
     self._has_hotel = False
 
     self._tile_type = 'property'
   
+  def houses(self):
+    '''Returns the amount of houses currently on the tile.
+    
+    If there happens to be a hotel on the tile, it will return 5.'''
+    return self._houses
+  
+  def has_hotel(self): return self._has_hotel
+
+  def mortgage(self):
+    assert self._houses == 0
+    super().mortgage()
+
   def rent(self):
-    '''Returns rent to be charged when landing on this tile.'''
     if not self.has_owner(): return 0
+    if self.is_mortgaged(): return 0
 
     if self._has_hotel: return self._rent_with_hotel
-    if self.owner().owns_color(self.color): # type: ignore
+    if self.owner().owns_color(self.color):
       match self._houses:
         case 0: return self._rent_with_color_set
         case 1: return self._rent_with_1_house
         case 2: return self._rent_with_2_houses
         case 3: return self._rent_with_3_houses
         case 4: return self._rent_with_4_houses
-        case _: raise
+        case _: raise ValueError('Too many houses')
     
-    return self._starting_rent
+    else: return self._starting_rent
+
+  def build(self):
+    '''Builds a house on the tile; or an hotel, in case there are 4 houses.
+    
+    In order to build on a tile, its owner must have its color set.
+    A new house cannot be built on a street until every other street in the
+    color set either has an hotel or has at least the number of houses on the
+    street you want to build on.
+
+    A tile may not be built on if any of the streets in its color set is
+    mortgaged.
+    
+    A tile may not be built on further after having built an hotel on it.'''
+
+    assert self.has_owner()
+    assert self.owner().owns_color(self.color)
+
+    assert all(not property.is_mortgaged()
+      for property in self.board().color(self.color))
+    assert self.houses() <= 4
+
+    assert all(
+      property.houses() >= self.houses()
+      for property in self.board().color(self.color)
+    )
+
+    if self.houses() == 4: # build hotel
+      self.owner().deduct(self._hotel_cost)
+      self._has_hotel = True
+
+    else: self.owner().deduct(self._house_cost)
+
+    self._houses += 1
+
+  def sell(self):
+    '''Sells a single house (or hotel) on the tile for half its price,
+    and entrusts the amount to its owner.
+
+    A house cannot be sold unless the number of houses in each street in the
+    color set is less than or equal to the number of houses on the street you
+    want to sell on. An hotel may always be sold.
+    
+    Cannot sell if there are no houses on the tile.'''
+    assert self.has_owner()
+    assert self.owner().owns_color(self.color)
+  
+    assert self.houses() > 0, 'No houses left to sell'
+
+    assert all(
+      property.houses() <= self.houses()
+      for property in self.board().color(self.color) if not property.is_mortgaged()
+    )
+
+    if self._has_hotel:
+      self.owner().entrust(self._hotel_cost//2)
+      self._has_hotel = False
+
+    else: self.owner().entrust(self._house_cost//2)
+
+    self._houses -= 1
+
+  def reset(self):
+    super().reset()
+    self._houses = 0
+    self._has_hotel = False
 
 class Station(Property):
   _starting_rent: int

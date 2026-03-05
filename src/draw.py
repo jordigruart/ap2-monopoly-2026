@@ -202,7 +202,7 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
         font_size = min(20, max(6, int(w / 8)))
         d.append(
             dw.Text(
-                " ".join(words),
+                "\n".join(words),
                 font_size,
                 cx,
                 cy,

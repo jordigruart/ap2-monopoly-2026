@@ -20,7 +20,7 @@ class Board:
     players_json_path: str,
   ):    
     # We assume the items appear in the files in positional order, just
-    # as they do in the files given to us.'''
+    # as they do in the files given to us.
     
     # load tiles
     self._tiles = list[Tile]()
@@ -59,25 +59,31 @@ class Board:
   def num_players(self) -> int: return len(self.players())
 
   def color(self, color: str) -> set[Street]:
-    '''Returns the set of properties on the board with that color.'''
+    '''Returns the set of streets on the board with that color.'''
     return self._colors[color]
   
   def jail_position(self) -> int: return 10
 
   def is_playing(self) -> bool: return self._is_playing
 
-  def _doubles(self) -> bool: return self.dice()[0] == self.dice()[1]
-  def _throw_dice(self) -> None: self._dice = random.randint(1, 6), random.randint(1, 6)
+  def _throw_dice(self) -> None:
+    '''Updates dice with two new random values.'''
+    self._dice = random.randint(1, 6), random.randint(1, 6)
 
   def _handle_doubles(self) -> None:
-    if self._doubles():
+    '''Updates the amount of straight doubles rolled and sends current player
+    to prison if they have rolled three doubles in a row.'''
+    self._doubles = self.dice()[0] == self.dice()[1]
+
+    if self._doubles:
       self._straight_doubles += 1
       
       if self._straight_doubles == 3:
         self.current_player().imprison()
 
   def _make_way_for_next_player(self) -> None:
-    self._stright_doubles = 0
+    '''Makes way for next player.'''
+    self._straight_doubles = 0
     self._index += 1
     self._index %= self.num_players()
 
@@ -93,7 +99,9 @@ class Board:
 
     self._handle_doubles()
 
-    if not self.current_player().can_play(): self._make_way_for_next_player(); return
+    if not self.current_player().can_play():
+      self._make_way_for_next_player()
+      return
 
     self.current_player().move_forward(sum(self.dice()))
     
@@ -104,7 +112,7 @@ class Board:
 
     draw(self, f'imgs/turn-{self._turn_accumulator:04d}-c.svg')
 
-    if not self._doubles(): self._make_way_for_next_player()
+    if not self._doubles: self._make_way_for_next_player()
   
   def play(self) -> None:
     LIM = 21
