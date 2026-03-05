@@ -122,7 +122,7 @@ class Player:
   def prompt_buy(self, property: Property):
     if random.randint(0, 1): self.buy(property)
   
-  def prompt_mortgage(self) -> None: pass
+  def prompt_mortgage(self) -> None: pass # TODO
 
   def is_in_prison(self) -> bool: return self._in_prison
 

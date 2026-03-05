@@ -28,7 +28,7 @@ class Tile:
 
   def land_on(self, player: Player) -> None:
     '''Handle what happens when a player lands on this tile. Do nothing by
-    default. Behaviour may be modified in inheritance class.
+    default.
     
     Note: GO bonus already handled by player.py's movement methods.'''
     if 'Go To Jail' in self.name(): player.imprison()
@@ -254,6 +254,8 @@ class Street(Property):
     self._houses -= 1
 
   def reset(self):
+    '''Resets property so that it may be claimed again. Removes all houses and
+    hotels. The previous owner gets no money from this operation.'''
     super().reset()
     self._houses = 0
     self._has_hotel = False
