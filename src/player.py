@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from tile import Street, Station, Utility, Property
-import const, random
+import const
+import aitools
 
 if TYPE_CHECKING:
   from board import Board
@@ -31,6 +32,7 @@ class Player:
 
     self._position = 0
     self._money = const.START_MONEY
+    self._in_prison = False
 
     self._streets = set[Street]()
     self._stations = set[Station]()
@@ -112,30 +114,72 @@ class Player:
   
   def buy(self, property: Property):
     self.deduct(property.price())
+    property.give_to(self)
 
     match property.tile_type():
       case 'property': self._streets.add(property)    # type: ignore
       case 'station': self._stations.add(property)    # type: ignore
       case 'utility': self._utilities.add(property)   # type: ignore
       case _: raise
+
+    print(f'{self.name()} has bought {property.name()}')
   
   def prompt_buy(self, property: Property):
-    if random.randint(0, 1): self.buy(property)
+    '''Prompts a player to buy.'''
+    if self.balance() >= const.UPPER_SPENDING_THRESHOLD: self.buy(property)
   
-  def prompt_mortgage(self) -> None: pass # TODO
+  def _selling_actions(self):
+    '''Tries to go above spending threshold.'''
+    # sell buildings
+    for color in filter(self.owns_color, const.COLORS):
+      color = self.board().color(color)
+
+      for property in aitools.selling_order(color):
+        property.sell()
+        if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
+    
+    # if still critical, mortgage until not
+    for property in self.owned_properties():
+      property.mortgage()
+      if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
+
+  def _buying_actions(self):
+    '''Tries to go below spending threshold.'''
+    # demortgage first
+    for property in filter(Property.is_mortgaged, self.owned_properties()):
+      property.demortgage()
+      if self.balance() < const.UPPER_SPENDING_THRESHOLD: return
+    
+    # if still can buy, buy until you cant
+    for color in filter(self.owns_color, reversed(const.COLORS)):
+      color = self.board().color(color)
+
+      for property in aitools.buying_order(color):
+        property.build()
+        if self.balance() < const.LOWER_SPENDING_THRESHOLD: return
+
+  def post_turn_actions(self):
+    if self.balance() < const.LOWER_SPENDING_THRESHOLD:
+      self._selling_actions()
+
+    if self.balance() >= const.UPPER_SPENDING_THRESHOLD:
+      self._buying_actions()
 
   def is_in_prison(self) -> bool: return self._in_prison
 
   def imprison(self) -> None: 
-    '''Sends player to jail and updates corresponding. Does not apply GO bonus.'''
-    self.set_position(self._board.jail_position(), False)
+    '''Sends player to jail. Does not apply GO bonus.'''
+    self.set_position(self._board.jail_position(), go_bonus = False)
     self._in_prison = True
-  
-  def eliminate(self) -> None:
+    raise const.EndTurn
+
+  def eliminate(self, creditor: Player) -> None:
     '''Eliminates self from play.'''
+    # for now this goes to the bank and not to the player that is lost to
     for property in self.owned_properties(): property.reset()
     for attr in self._streets, self._stations, self._utilities: attr.clear()
-    
+    raise const.EndTurn
+
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
   """Build a Player from JSON-like dict with 'name', 'piece', and 'color' keys."""
   return Player(board, data["name"], data["piece"], data["color"], index)

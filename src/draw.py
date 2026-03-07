@@ -213,7 +213,7 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
         )
         # Mortgaged properties: show "M" on the inside (inner corner)
         if tile.tile_type() in ("property", "station", "utility") and getattr(
-            tile, "is_mortgaged", False
+            tile, "_is_mortgaged", False
         ):
             d.append(
                 dw.Text(
@@ -258,9 +258,9 @@ def draw_houses_and_hotels(d: dw.Drawing, board: Board) -> None:
         if tile.tile_type() != "property":
             continue
 
-        houses = getattr(tile, "houses", 0)
-        hotels = getattr(tile, "hotels", 0)
-        if houses == 0 and hotels == 0:
+        houses = getattr(tile, "_houses", 0)
+        has_hotel = getattr(tile, "_has_hotel", 0)
+        if houses == 0 and not has_hotel:
             continue
 
         x, y, w, _h = tile_rect(tile.position())
@@ -283,7 +283,7 @@ def draw_houses_and_hotels(d: dw.Drawing, board: Board) -> None:
                     font_family=FONT_FAMILY,
                 )
             )
-        if hotels > 0:
+        if has_hotel:
             cx = start_x + 4 * (slot_w + gap) + slot_w / 2
             d.append(
                 dw.Text(
@@ -496,7 +496,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
             sorted_props = sorted(player.owned_properties(), key=lambda p: p.position())
             for p in sorted_props[:max_props]:
                 name_text = (
-                    f"{p.name()} (M)" if getattr(p, "is_mortgaged", False) else p.name()
+                    f"{p.name()} (M)" if getattr(p, "_is_mortgaged", False) else p.name()
                 )
                 # Symbol: ⬤ (color) for streets, 🚆 stations, 💡 electric, 🚰 water
                 if p.tile_type() == "property":
@@ -538,7 +538,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
                         qx + pad + symbol_width,
                         ty,
                         font_style=(
-                            "italic" if getattr(p, "is_mortgaged", False) else "normal"
+                            "italic" if getattr(p, "_is_mortgaged", False) else "normal"
                         ),
                         font_family=FONT_FAMILY,
                     )

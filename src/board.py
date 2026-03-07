@@ -1,33 +1,28 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Iterator, Iterable
 
 import pickle, json
 from player import Player, build_player
 from tile import Tile, Street, build_tile
 from draw import draw
 from deck import Deck
+from card import Card
 
-import random
+import random, const
 
 class Board:
   _tiles: list[Tile]
   _colors: dict[str, set[Street]]
 
-  def __init__(
-    self,
-    tiles_json_path: str,
-    chance_json_path: str,
-    community_chest_json_path: str,
-    players_json_path: str,
-  ):
+  def __init__(self):
     # We assume the items appear in the files in positional order, just
     # as they do in the files given to us.
     
     # load tiles
     self._tiles = list[Tile]()
     self._colors = dict[str, set[Street]]()
-    with open(tiles_json_path, encoding = 'UTF-8') as file:
+    with open(const.TILES_JSON_PATH, encoding = 'UTF-8') as file:
       for raw_tile in json.load(file):
         tile = build_tile(self, raw_tile)
         self._tiles.append(tile)
@@ -39,11 +34,11 @@ class Board:
           self._colors[tile.color].add(tile)
 
     # load decks
-    self._chance_deck = Deck(chance_json_path)
-    self._community_deck = Deck(community_chest_json_path)
+    self._chance_deck = Deck(const.CHANCE_JSON_PATH)
+    self._community_deck = Deck(const.COMMUNITY_CHEST_JSON_PATH)
 
     # load players
-    with open(players_json_path, encoding = 'UTF-8') as file:
+    with open(const.PLAYERS_JSON_PATH, encoding = 'UTF-8') as file:
       players = json.load(file)
       self._players = [build_player(self, players[i], i) for i in range(len(players))]
     
@@ -57,7 +52,6 @@ class Board:
   def tiles(self) -> list[Tile]: return self._tiles
   def dice(self) -> tuple[int, int]: return self._dice
 
-  def num_tiles(self) -> int: return 40
   def num_players(self) -> int: return len(self.players())
 
   def color(self, color: str) -> set[Street]:
@@ -92,20 +86,12 @@ class Board:
   def _play_turn(self):
     self._turn_accumulator += 1
     print(f'TURN {self._turn_accumulator}: {self.current_player().name()}\'s turn')
-
-    if not self.current_player().can_play():
-      self._make_way_for_next_player()
-      return
     
     self._throw_dice()
     print(f'{self.current_player().name()} rolled {self._dice}')
     draw(self, f'imgs/turn-{self._turn_accumulator:04d}-a.svg')
 
     self._handle_doubles()
-  
-    if not self.current_player().can_play():
-      self._make_way_for_next_player()
-      return
 
     self.current_player().move_forward(sum(self.dice()))
     
@@ -113,34 +99,34 @@ class Board:
 
     current_tile = self.tiles()[self.current_player().position()]
 
-    print(f'{self.current_player().name()} has landed on {current_tile}')
+    print(f'{self.current_player().name()} has landed on {current_tile.name()}')
     current_tile.land_on(self.current_player())
 
     draw(self, f'imgs/turn-{self._turn_accumulator:04d}-c.svg')
 
-    if not self._doubles: self._make_way_for_next_player()
+    raise const.EndTurn
   
   def play(self) -> None:
     '''Plays the game until only one player is standing. Progressively
     generates illustrations of the board state for every turn, which are stored
     in ./imgs'''
-    LIM = 21
-    for _ in range(LIM): self._play_turn()
+    lim = 21
+    for _ in range(lim):
+      try: self._play_turn()
+      except const.EndTurn: self._make_way_for_next_player()
 
 class DebugBoard(Board):
   '''Altered version of the normal board used for testing.
-  Takes an iterator of die rolls for an input, instead of using a seed.
-  Stops execution when there are no more die to roll.'''
+  Takes an iterator of die rolls for an input, instead of using a seed to generate inputs.
+  Stops execution when there are no more dice to roll.'''
   def __init__(
     self,
-    tiles_json_path: str,
-    chance_json_path: str,
-    community_chest_json_path: str,
-    players_json_path: str,
-    die_inputs: Iterator[tuple[int, int]]
+    die_inputs: Iterable[tuple[int, int]],
+    cards: Iterable[Card] = list[Card]()
   ):
-    super().__init__(tiles_json_path, chance_json_path, community_chest_json_path, players_json_path)
-    self._die_inputs = die_inputs
+    super().__init__()
+    self._die_inputs = iter(die_inputs)
+    self._cards = iter(cards)
   
   def _throw_dice(self) -> None:
     '''Updates dice to next tuple in die inputs.
@@ -148,8 +134,15 @@ class DebugBoard(Board):
     self._dice = next(self._die_inputs)
   
   def play(self) -> None:
+    '''Runs game until die inputs end.'''
     try: super().play()
-    except StopIteration: print('Dice rolls finished.')
+    except StopIteration: print('Die rolls or cards finished. Stopping play')
+
+  def run(self, turns: int = 256) -> None:
+    '''Runs game for a limited number of turns.'''
+    for _ in range(turns):
+      try: self._play_turn()
+      except const.EndTurn: self._make_way_for_next_player()
 
 def save_board(board: Board, pickle_path: str) -> None:
   with open(pickle_path, "wb") as f: pickle.dump(board, f)
