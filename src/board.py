@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterator, Iterable
+from typing import Iterable
 
 import pickle, json
 from player import Player, build_player
@@ -47,6 +47,8 @@ class Board:
 
     self._straight_doubles = 0
 
+    self._image_counter = 0
+
   def players(self) -> list[Player]: return self._players
   def current_player(self) -> Player: return self.players()[self._index]
   def tiles(self) -> list[Tile]: return self._tiles
@@ -74,8 +76,11 @@ class Board:
     if self._doubles:
       self._straight_doubles += 1
       
-      if self._straight_doubles == 3:
-        self.current_player().imprison()
+      if self._straight_doubles == 3: self.current_player().imprison()
+
+  def draw(self) -> None:
+    draw(self, f'imgs/{self._image_counter:05d}.svg')
+    self._image_counter += 1
 
   def _make_way_for_next_player(self) -> None:
     '''Makes way for next player.'''
@@ -89,20 +94,20 @@ class Board:
     
     self._throw_dice()
     print(f'{self.current_player().name()} rolled {self._dice}')
-    draw(self, f'imgs/turn-{self._turn_accumulator:04d}-a.svg')
+    self.draw()
 
     self._handle_doubles()
 
     self.current_player().move_forward(sum(self.dice()))
     
-    draw(self, f'imgs/turn-{self._turn_accumulator:04d}-b.svg')
+    self.draw()
 
     current_tile = self.tiles()[self.current_player().position()]
 
     print(f'{self.current_player().name()} has landed on {current_tile.name()}')
     current_tile.land_on(self.current_player())
 
-    draw(self, f'imgs/turn-{self._turn_accumulator:04d}-c.svg')
+    self.current_player().post_turn_actions()
 
     raise const.EndTurn
   
@@ -113,7 +118,9 @@ class Board:
     lim = 21
     for _ in range(lim):
       try: self._play_turn()
-      except const.EndTurn: self._make_way_for_next_player()
+      except const.EndTurn:
+        if (self._straight_doubles == 3
+          or not self._doubles): self._make_way_for_next_player()
 
 class DebugBoard(Board):
   '''Altered version of the normal board used for testing.
@@ -142,7 +149,8 @@ class DebugBoard(Board):
     '''Runs game for a limited number of turns.'''
     for _ in range(turns):
       try: self._play_turn()
-      except const.EndTurn: self._make_way_for_next_player()
+      except const.EndTurn:
+        if not self._doubles: self._make_way_for_next_player()
 
 def save_board(board: Board, pickle_path: str) -> None:
   with open(pickle_path, "wb") as f: pickle.dump(board, f)

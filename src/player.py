@@ -114,7 +114,7 @@ class Player:
   
   def buy(self, property: Property):
     self.deduct(property.price())
-    property.give_to(self)
+    property.set_owner(self)
 
     match property.tile_type():
       case 'property': self._streets.add(property)    # type: ignore
@@ -123,6 +123,7 @@ class Player:
       case _: raise
 
     print(f'{self.name()} has bought {property.name()}')
+    self.board().draw()
   
   def prompt_buy(self, property: Property):
     '''Prompts a player to buy.'''
@@ -171,6 +172,7 @@ class Player:
     '''Sends player to jail. Does not apply GO bonus.'''
     self.set_position(self._board.jail_position(), go_bonus = False)
     self._in_prison = True
+    self.board().draw()
     raise const.EndTurn
 
   def eliminate(self, creditor: Player) -> None:

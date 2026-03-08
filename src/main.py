@@ -8,4 +8,5 @@ def main() -> None:
 if __name__ == "__main__":
   main()
 
-'''TODO: imprison method does not work'''
+'''TODO: imprison method does not work
+TODO: doubles dont work because EndTurn always _makes_way_for_next_player.'''

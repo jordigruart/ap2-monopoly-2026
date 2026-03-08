@@ -31,7 +31,7 @@ class Tile:
     default.
     
     Note: GO bonus already handled by player.py's movement methods.'''
-    if 'Go To Jail' in self.name(): player.imprison()
+    if 'Go To Jail' in self.name(): player.imprison()    
     else: pass 
 
 class Tax(Tile):
@@ -45,7 +45,9 @@ class Tax(Tile):
     self._amount = amount
     self._tile_type = 'tax'
   
-  def land_on(self, player: Player): player.deduct(self._amount)
+  def land_on(self, player: Player):
+    player.deduct(self._amount)
+    self.board().draw()
 
 class DeckTile(Tile):
   def __init__(self, board: Board, position: int, name: str,
@@ -53,6 +55,9 @@ class DeckTile(Tile):
     super().__init__(board, position, name)
     
     self._tile_type = tile_type
+  
+  def land_on(self, player: Player):
+    self.board().draw()
 
 class Property(Tile):
   _price: int
@@ -100,12 +105,15 @@ class Property(Tile):
     if self.has_owner():
       if not self.is_mortgaged() and not player.owns(self):
         self.owner().entrust(player.deduct(self.rent())) # type: ignore
+        print(f'{player.name()} has paid ${self.rent()} to {self.owner().name()}')
+        self.board().draw()
 
     else:
       player.prompt_buy(self)
 
-  def give_to(self, player: Player):
-    '''Gives this property to the player.'''
+  def set_owner(self, player: Player):
+    '''Sets this tile's owner to the specified player.
+    This method does not charge the player any money.'''
     self._owner = player
 
   def mortgage(self):
@@ -118,6 +126,8 @@ class Property(Tile):
     assert not self.is_mortgaged()
     self._is_mortgaged = True
     self.owner().entrust(self._mortgage) # type: ignore
+
+    self.board().draw()
   
   def demortgage(self):
     '''Demortgages tile and deducts 110% of its mortgage fee from its owner.'''
@@ -125,6 +135,8 @@ class Property(Tile):
     assert self.is_mortgaged()
     self._is_mortgaged = False
     self.owner().deduct(int(self._mortgage * const.MORTGAGE_INTEREST_RATE)) # type: ignore
+
+    self.board().draw()
 
 class Street(Property):
   _starting_rent: int
@@ -164,7 +176,7 @@ class Street(Property):
     self._house_cost = house_cost 
     self._hotel_cost = hotel_cost 
 
-    self._houses = 0 # amount of houses on property; 5 with whotel
+    self._houses = 0 # amount of houses on property; 5 with hotel
     self._has_hotel = False
 
     self._tile_type = 'property'
@@ -219,7 +231,7 @@ class Street(Property):
 
     assert all(
       property.houses() >= self.houses()
-      for property in self.board().color(self.color)
+      for property in self.board().color(self.color) #do we have to check if it is mortgage
     )
 
     if self.houses() == 4: # build hotel
@@ -229,6 +241,9 @@ class Street(Property):
     else: self.owner().deduct(self._house_cost) # type: ignore
 
     self._houses += 1
+
+    self.board().draw()
+    print(f'''{self.owner().name()} has built on {self.name()}. The tile now has {'an hotel' if self.has_hotel() else str(self._houses) + ' houses'}.''')
 
   def sell(self):
     '''Sells a single house (or hotel) on the tile for half its price,
@@ -256,6 +271,7 @@ class Street(Property):
     else: self.owner().entrust(self._house_cost//2) # type: ignore
 
     self._houses -= 1
+    self.board().draw()
 
   def reset(self):
     '''Resets property so that it may be claimed again. Removes all houses and
