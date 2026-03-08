@@ -4,8 +4,9 @@ from typing import Iterator
 def selling_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which buildings must be sold in a color
   set (according to the "sell evenly" rule).'''
-  # asymptotically, this be faster using a priority queue but, since color
-  # sets are small, it is not terribly inefficient
+  # asymptotically, this (O(n^2) is slower than using a priority queue (O(n log n))
+  # color sets, however, are small
+  # so this is not terribly inefficient
   while True:
     candidate = max(color, key = lambda property: property.houses())
     if candidate.houses() > 0: yield candidate

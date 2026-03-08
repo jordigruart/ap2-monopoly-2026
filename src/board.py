@@ -40,7 +40,7 @@ class Board:
     # load players
     with open(const.PLAYERS_JSON_PATH, encoding = 'UTF-8') as file:
       players = json.load(file)
-      self._players = [build_player(self, players[i], i) for i in range(len(players))]
+      self._players = [build_player(self, player, i) for i, player in enumerate(players)]
     
     self._turn_accumulator, self._index = 0, 0
     self._is_playing = True
@@ -62,11 +62,11 @@ class Board:
   
   def jail_position(self) -> int: return 10
 
-  def is_playing(self) -> bool: return self._is_playing
-
-  def _throw_dice(self) -> None:
-    '''Updates dice with two new random values.'''
+  def throw_dice(self) -> None:
+    '''Updates dice with two new random values and redraws board.'''
     self._dice = random.randint(1, 6), random.randint(1, 6)
+    print(f'{self.current_player()} rolled {self._dice}')
+    self.draw()
 
   def _handle_doubles(self) -> None:
     '''Updates the amount of straight doubles rolled and sends current player
@@ -79,6 +79,8 @@ class Board:
       if self._straight_doubles == 3: self.current_player().imprison()
 
   def draw(self) -> None:
+    '''Draws the board and increments the image counter.
+    This function is called whenever the board is updated substantially.'''
     draw(self, f'imgs/{self._image_counter:05d}.svg')
     self._image_counter += 1
 
@@ -88,23 +90,43 @@ class Board:
     self._index += 1
     self._index %= self.num_players()
 
-  def _play_turn(self):
-    self._turn_accumulator += 1
-    print(f'TURN {self._turn_accumulator}: {self.current_player().name()}\'s turn')
+  def _prison_routine(self):
+    assert self.current_player().is_in_prison()
+
+    if self.current_player().turns_in_prison() == 3:
+      self.current_player().free()
+      return
+
+    self.throw_dice()
+    if self.dice()[0] == self.dice()[1]:
+      self.current_player().free()
+      return
     
-    self._throw_dice()
-    print(f'{self.current_player().name()} rolled {self._dice}')
-    self.draw()
+    if self.current_player().get_out_of_jail_free_cards() > 0:
+      self.current_player().prompt_use_goojfc()
+      return
+    
+    self.current_player().log_a_turn_in_prison()
+    raise const.EndTurn
+
+  def _play_turn(self):
+    if self.current_player().is_bankrupt(): raise const.EndTurn
+
+    self._turn_accumulator += 1
+    print(f'TURN {self._turn_accumulator}: {self.current_player()}\'s turn')
+
+    if self.current_player().is_in_prison(): self._prison_routine()
+    
+    self.throw_dice()
 
     self._handle_doubles()
-
     self.current_player().move_forward(sum(self.dice()))
     
     self.draw()
 
     current_tile = self.tiles()[self.current_player().position()]
 
-    print(f'{self.current_player().name()} has landed on {current_tile.name()}')
+    print(f'{self.current_player()} has landed on {current_tile}')
     current_tile.land_on(self.current_player())
 
     self.current_player().post_turn_actions()
@@ -115,7 +137,7 @@ class Board:
     '''Plays the game until only one player is standing. Progressively
     generates illustrations of the board state for every turn, which are stored
     in ./imgs'''
-    lim = 21
+    lim = 1000
     for _ in range(lim):
       try: self._play_turn()
       except const.EndTurn:
@@ -135,17 +157,18 @@ class DebugBoard(Board):
     self._die_inputs = iter(die_inputs)
     self._cards = iter(cards)
   
-  def _throw_dice(self) -> None:
+  def throw_dice(self) -> None:
     '''Updates dice to next tuple in die inputs.
     Raises StopIteration if there are no more inputs.'''
     self._dice = next(self._die_inputs)
+    self.draw()
   
   def play(self) -> None:
     '''Runs game until die inputs end.'''
     try: super().play()
     except StopIteration: print('Die rolls or cards finished. Stopping play')
 
-  def run(self, turns: int = 256) -> None:
+  def run(self, turns: int) -> None:
     '''Runs game for a limited number of turns.'''
     for _ in range(turns):
       try: self._play_turn()

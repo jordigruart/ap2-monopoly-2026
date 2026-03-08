@@ -21,6 +21,8 @@ class Tile:
 
     self._tile_type = 'special' # to be overridden in inheritance class
 
+  def __str__(self) -> str: return self.name()
+
   def tile_type(self) -> str: return self._tile_type
   def name(self) -> str: return self._name
   def position(self) -> int: return self._position
@@ -319,9 +321,16 @@ class Utility(Property):
   ):
     super().__init__(board, position, name, price, mortgage)
 
+    self._default_multiplier = default_multiplier
+    self._multiplier_with_both = multiplier_with_both
+    
     self._tile_type = 'utility'
   
-  def rent(self) -> int: ... # TODO
+  def rent(self) -> int:
+    if not self.has_owner(): return 0
+
+    self.board().throw_dice()
+    return sum(self.board().dice()) * (self._default_multiplier if self.owner().utility_count() == 1 else self._multiplier_with_both)
 
 def build_tile(board: Board, data: dict[str, Any]) -> Tile:
   tile_type = data['type']

@@ -32,11 +32,16 @@ class Player:
 
     self._position = 0
     self._money = const.START_MONEY
+
     self._in_prison = False
+    self._turns_in_prison = 0
+    self._get_out_of_jail_free_cards = 0
 
     self._streets = set[Street]()
     self._stations = set[Station]()
     self._utilities = set[Utility]()
+
+  def __str__(self) -> str: return self.name()
 
   def board(self) -> Board: return self._board
   def name(self) -> str: return self._name
@@ -44,10 +49,49 @@ class Player:
   def color(self) -> str: return self._color
   def index(self) -> int: return self._index
 
+  def balance(self) -> int: return self._money
+  def is_bankrupt(self) -> bool: return self._money < 0
   def position(self) -> int: return self._position
 
-  def balance(self) -> int: return self._money
+  def is_in_prison(self) -> bool: return self._in_prison
+  def turns_in_prison(self) -> int: return self._turns_in_prison
+  def get_out_of_jail_free_cards(self) -> int: return self._get_out_of_jail_free_cards
+
+  def imprison(self) -> None: 
+    '''Sends player to jail and draws the board. Does not apply GO bonus.'''
+    self.set_position(self._board.jail_position(), go_bonus = False)
+    self._in_prison = True
+    self.board().draw()
+    print(f'{self} has gone to jail')
+    raise const.EndTurn
+
+  def free(self) -> None:
+    '''Frees a player from jail, allowing them to play normally.'''
+    self._in_prison = False
+    self._turns_in_prison = 0
+    print(f'{self} has been freed from jail')
+  
+  def prompt_use_goojfc(self) -> None:
+    '''Prompts player to use a get out of jail free card.'''
+    if self._get_out_of_jail_free_cards > 0:
+      self.free()
+      self._get_out_of_jail_free_cards -= 1
+
+  def log_a_turn_in_prison(self) -> None:
+    '''Increments internal count of amount of contiguous turns spent in prison
+    by one.'''
+    self._turns_in_prison += 1
+
+  def station_count(self) -> int:
+    '''Returns how many stations are currently in the player's posession.'''
+    return len(self._stations)
+  
+  def utility_count(self) -> int:
+    '''Returns how many utilities are currently in the player's posession.'''
+    return len(self._utilities)
+  
   def owned_properties(self) -> set[Property]:
+    '''Returns the set of properties currently owned by the player.'''
     return self._streets | self._stations | self._utilities # type: ignore
 
   def owns(self, property: Property) -> bool:
@@ -58,21 +102,7 @@ class Player:
     '''Returns whether the player owns every property in the specified color
     set.'''
     return all(self.owns(property) for property in self.board().color(color))
-
-  def is_bankrupt(self) -> bool: return self._money < 0
   
-  def get_out_of_jail_free_cards(self) -> int: return 0
-  def turns_in_prison(self) -> int: return 0
-
-  def can_play(self) -> bool: return True
-
-  def station_count(self) -> int:
-    '''Returns how many stations are currently in this player's posession.'''
-    return len(self._stations)
-  
-  def utility_count(self) -> int:
-    '''Returns how many utilities are currently in this player's posession.'''
-    return len(self._utilities)
 
   def entrust(self, increment: int) -> None:
     '''Increments the player's balance by the specified amount.'''
@@ -83,6 +113,7 @@ class Player:
     amount deducted.'''
     self._money -= decrement
     return decrement
+  
 
   def move_forward(self, increment: int, go_bonus: bool = True) -> None:
     '''Moves player forward by the increment.
@@ -112,6 +143,7 @@ class Player:
     if go_bonus and position <= self._position: self._money += const.GO_SALARY
     self._position = position
   
+
   def buy(self, property: Property):
     self.deduct(property.price())
     property.set_owner(self)
@@ -128,7 +160,15 @@ class Player:
   def prompt_buy(self, property: Property):
     '''Prompts a player to buy.'''
     if self.balance() >= const.UPPER_SPENDING_THRESHOLD: self.buy(property)
-  
+
+
+  def post_turn_actions(self):
+    if self.balance() < const.LOWER_SPENDING_THRESHOLD:
+      self._selling_actions()
+
+    if self.balance() >= const.UPPER_SPENDING_THRESHOLD:
+      self._buying_actions()
+
   def _selling_actions(self):
     '''Tries to go above spending threshold.'''
     # sell buildings
@@ -141,8 +181,9 @@ class Player:
     
     # if still critical, mortgage until not
     for property in self.owned_properties():
-      property.mortgage()
-      if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
+      if not property.is_mortgaged():
+        property.mortgage()
+        if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
 
   def _buying_actions(self):
     '''Tries to go below spending threshold.'''
@@ -159,21 +200,6 @@ class Player:
         property.build()
         if self.balance() < const.LOWER_SPENDING_THRESHOLD: return
 
-  def post_turn_actions(self):
-    if self.balance() < const.LOWER_SPENDING_THRESHOLD:
-      self._selling_actions()
-
-    if self.balance() >= const.UPPER_SPENDING_THRESHOLD:
-      self._buying_actions()
-
-  def is_in_prison(self) -> bool: return self._in_prison
-
-  def imprison(self) -> None: 
-    '''Sends player to jail. Does not apply GO bonus.'''
-    self.set_position(self._board.jail_position(), go_bonus = False)
-    self._in_prison = True
-    self.board().draw()
-    raise const.EndTurn
 
   def eliminate(self, creditor: Player) -> None:
     '''Eliminates self from play.'''

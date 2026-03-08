@@ -1,14 +1,26 @@
 import pytest
 
+from player import Player
 from tile import *
 
 from board import DebugBoard
 import const
 
+def test_tax():
+  board = DebugBoard(
+    die_inputs = [(4, 0)]
+  )
+
+  board.play()
+
+  jordi = board.players()[0]
+  tax = board.tiles()[4]
+
+  assert jordi.balance() == const.START_MONEY - getattr(tax, '_amount')
+
 def test_buy():
   board = DebugBoard(
-    die_inputs = iter([(3, 0)]),
-    cards = []
+    die_inputs = [(3, 0)],
   )
   
   board.play()
@@ -23,7 +35,7 @@ def test_buy():
 
 def test_rent_charged():
   board = DebugBoard(
-    die_inputs = [(3, 0), (3, 0)],
+    die_inputs = [(3, 0), (3, 0)]
   )
 
   board.play()
@@ -46,7 +58,7 @@ def test_rent_charged():
 
 def test_color_set():
   board = DebugBoard(
-    die_inputs = [(-1, 1), (1, 0)]
+    die_inputs = [(-1, 1), (2, 1)]
   )
 
   board.run(1)
@@ -54,17 +66,16 @@ def test_color_set():
   jordi = board.players()[0]
   old_kent, tmp, whitechapel = board.tiles()[1:4]
   
+  for property in old_kent, whitechapel: jordi.buy(property)
+  
   assert isinstance(old_kent, Street) # for type checking
   assert isinstance(whitechapel, Street)
-  for property in old_kent, whitechapel: jordi.buy(property)
 
   mireia = board.players()[1]
-
   assert jordi.owns_color('brown')
 
   board.run(1)
 
-  print(getattr(whitechapel, '_rent_with_color_set'))
   assert jordi.balance() == (
     const.START_MONEY
     - getattr(old_kent, '_price')
@@ -97,7 +108,8 @@ def test_station_rent():
 
   assert jordi.station_count() == 1
   assert jordi.balance() == (
-    const.START_MONEY - kings_cross_station.price() + getattr(kings_cross_station, '_starting_rent')
+    const.START_MONEY - kings_cross_station.price()
+    + getattr(kings_cross_station, '_starting_rent')
   )
   assert mireia.balance() == (
     const.START_MONEY - getattr(kings_cross_station, '_starting_rent')
@@ -157,8 +169,10 @@ def test_buying_orderly():
     die_inputs = [(-1, 1)]
   )
 
+  board.play()
+
   jordi = board.players()[0]
-  for property in board.color('green'): property.set_owner(jordi)
+  for property in board.color('green'): jordi.buy(property)
 
   regent, oxford, tmp, bond = board.tiles()[31:35]
   assert isinstance(regent, Street)
@@ -174,6 +188,8 @@ def test_building_twice_in_a_row():
       die_inputs = [(-1, 1)]
     )
 
+    board.play()
+
     jordi = board.players()[0]
     for property in board.color('green'): property.set_owner(jordi)
 
@@ -182,8 +198,9 @@ def test_building_twice_in_a_row():
 
     for _ in range(2): regent.build()
 
-def test_ai_builds_properly():
-  '''Tests whether the player AI can get through the building limitations.'''
+def test_ai_builds_properly_from_zero():
+  '''Tests whether the player AI knows how to build from 0 houses on a set to
+  three hotels granted unlimited funds.'''
   board = DebugBoard(
     die_inputs = [(-1, 1)]
   )
@@ -192,6 +209,27 @@ def test_ai_builds_properly():
   for property in board.color('green'): property.set_owner(jordi)
 
   jordi.entrust(100000)
+
+  board.play()
+  assert all(property.has_hotel() for property in board.color('green'))
+
+def test_ai_builds_properly_from_a_start():
+  board = DebugBoard(
+    die_inputs = [(5, 5), (-1, 1)]
+  )
+  board.run(1)
+
+  jordi = board.players()[0]
+  jordi.entrust(100000)
+
+  for property in board.color('green'): jordi.buy(property)
+
+  regent, oxford, tmp, bond = board.tiles()[31:35]
+  assert isinstance(regent, Street)
+  assert isinstance(oxford, Street)
+  assert isinstance(bond, Street)
+
+  regent.build(); oxford.build()
 
   board.play()
   assert all(property.has_hotel() for property in board.color('green'))
