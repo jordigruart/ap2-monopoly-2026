@@ -61,6 +61,7 @@ class Player:
     '''Sends player to jail and draws the board. Does not apply GO bonus.'''
     self.set_position(self._board.jail_position(), go_bonus = False)
     self._in_prison = True
+    self._turns_in_prison = 0
     self.board().draw()
     print(f'{self} has gone to jail')
     raise const.EndTurn
@@ -101,8 +102,8 @@ class Player:
   def owns_color(self, color: str) -> bool:
     '''Returns whether the player owns every property in the specified color
     set.'''
-    return all(self.owns(property) for property in self.board().color(color))
-  
+    return all(self.owns(property) for property in self.board().color_set(color))
+
 
   def entrust(self, increment: int) -> None:
     '''Increments the player's balance by the specified amount.'''
@@ -143,23 +144,30 @@ class Player:
     if go_bonus and position <= self._position: self._money += const.GO_SALARY
     self._position = position
   
-
-  def buy(self, property: Property):
-    self.deduct(property.price())
-    property.set_owner(self)
+  def entrust_property(self, property: Property):
+    '''Gives the specified property to this player and draws the board. Changes all the
+    internal variables that handle ownership, both in the player and in the
+    tile.'''
+    property.__setattr__('_owner', self)
 
     match property.tile_type():
       case 'property': self._streets.add(property)    # type: ignore
       case 'station': self._stations.add(property)    # type: ignore
       case 'utility': self._utilities.add(property)   # type: ignore
       case _: raise
+    
+    self.board().draw()
+
+  def buy(self, property: Property):
+    assert self.balance() >= property.price(), 'Insufficient funds'
+    self.deduct(property.price())
 
     print(f'{self.name()} has bought {property.name()}')
-    self.board().draw()
   
   def prompt_buy(self, property: Property):
     '''Prompts a player to buy.'''
-    if self.balance() >= const.UPPER_SPENDING_THRESHOLD: self.buy(property)
+    if (self.balance() >= const.UPPER_SPENDING_THRESHOLD
+    and self.balance() >= property.price()): self.buy(property)
 
 
   def post_turn_actions(self):
@@ -173,7 +181,7 @@ class Player:
     '''Tries to go above spending threshold.'''
     # sell buildings
     for color in filter(self.owns_color, const.COLORS):
-      color = self.board().color(color)
+      color = self.board().color_set(color)
 
       for property in aitools.selling_order(color):
         property.sell()
@@ -189,23 +197,48 @@ class Player:
     '''Tries to go below spending threshold.'''
     # demortgage first
     for property in filter(Property.is_mortgaged, self.owned_properties()):
-      property.demortgage()
-      if self.balance() < const.UPPER_SPENDING_THRESHOLD: return
+      if self.balance() >= property.demortgage_fee():
+        property.demortgage()
+        if self.balance() < const.UPPER_SPENDING_THRESHOLD: return
+
+      else: return
     
     # if still can buy, buy until you cant
     for color in filter(self.owns_color, reversed(const.COLORS)):
-      color = self.board().color(color)
+      color = self.board().color_set(color)
 
       for property in aitools.buying_order(color):
-        property.build()
-        if self.balance() < const.LOWER_SPENDING_THRESHOLD: return
+        if self.balance() >= property.building_cost():
+          property.build()
+          if self.balance() < const.LOWER_SPENDING_THRESHOLD: return
 
+        else: return
 
-  def eliminate(self, creditor: Player) -> None:
-    '''Eliminates self from play.'''
+  def grant_property(self, property: Property):
+    '''When a player is eliminated from play, they give all their mortgaged
+    properties to the owner of the space that made them bankrupt. The reciever
+    then must choose whether to repay the mortgage or keep it by paying 10% of
+    the mortgage value.
+    
+    This function changes the property's owner and handles that choice.'''
+    assert property.is_mortgaged()
+    self.entrust_property(property)
+    if (self.balance() >= property.demortgage_fee()
+      and self.balance() >= const.LOWER_SPENDING_THRESHOLD): property.demortgage()
+    else: self.deduct(int(.1 * property.mortgage_bonus()))
+
+    if self.is_bankrupt(): self.eliminate(None)
+
+  def eliminate(self, creditor: Player | None) -> None:
+    '''Eliminates self from play. Gives all GOOJF cards and all mortgaged
+    properties to creditor, or frees them if'''
     # for now this goes to the bank and not to the player that is lost to
-    for property in self.owned_properties(): property.reset()
-    for attr in self._streets, self._stations, self._utilities: attr.clear()
+    for property in self.owned_properties():
+      if property.is_mortgaged():
+        if creditor is None: property.reset()
+        else: creditor.grant_property(property)
+      else: property.reset()
+
     raise const.EndTurn
 
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:

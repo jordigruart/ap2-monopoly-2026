@@ -2,7 +2,7 @@ from board import Board
 import random
 
 def main() -> None:
-  random.seed(25)
+  random.seed(-1)
   Board().play()
 
 if __name__ == "__main__":

@@ -17,5 +17,5 @@ def buying_order(color: set[Street]) -> Iterator[Street]:
   (according to the "build evenly" rule).'''
   while True:
     candidate = min(color, key = lambda property: property.houses())
-    if candidate.houses() < 5: yield candidate
+    if not candidate.has_hotel(): yield candidate
     else: return

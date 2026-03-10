@@ -68,6 +68,8 @@ class Property(Tile):
   _owner: Optional[Player]
   _is_mortgaged: bool
 
+  _rent: int
+
   def __init__(self, board: Board, position: int, name: str,
     price: int, mortgage: int):
     super().__init__(board, position, name)
@@ -79,21 +81,20 @@ class Property(Tile):
     self._tile_type = 'property'
 
     self._is_mortgaged = False
+    self._rent = 0
 
   def price(self) -> int: return self._price
   def is_mortgaged(self) -> bool: return self._is_mortgaged
   
-  def has_owner(self) -> bool:
-    '''Returns whether the property is in somebody's possession.'''
-    return self._owner is not None
-  
+  def mortgage_bonus(self) -> int: return self._mortgage
+  def demortgage_fee(self) -> int: return int(self.mortgage_bonus() * const.MORTGAGE_INTEREST_RATE)
+
   def owner(self) -> Optional[Player]:
     '''Returns the owner of the property, or None if it is not owned.'''
     return self._owner
   
   def rent(self) -> int:
-    '''Returns the rent to be charged considering the current state of the
-    board.'''
+    '''Returns the rent to be charged considering the current state of the board.'''
     # to be implemented in subclass
     raise NotImplementedError
 
@@ -104,19 +105,16 @@ class Property(Tile):
     self._owner = None
   
   def land_on(self, player: Player) -> None:
-    if self.has_owner():
+    if self.owner() is not None:
       if not self.is_mortgaged() and not player.owns(self):
-        self.owner().entrust(player.deduct(self.rent())) # type: ignore
-        print(f'{player.name()} has paid ${self.rent()} to {self.owner().name()}')
+        rent = self.rent()
+
+        self.owner().entrust(player.deduct(rent)) # type: ignore
+        print(f'{player} has paid ${rent} to {self.owner()}')
         self.board().draw()
 
     else:
       player.prompt_buy(self)
-
-  def set_owner(self, player: Player):
-    '''Sets this tile's owner to the specified player.
-    This method does not charge the player any money.'''
-    self._owner = player
 
   def mortgage(self):
     '''Mortgages tile, granting its owner the tile's corresponding mortgage
@@ -124,7 +122,7 @@ class Property(Tile):
     
     If the tile is a street, there must be no houses or hotels on the tile in
     order to be mortgaged.'''
-    assert self.has_owner()
+    assert self.owner() is not None
     assert not self.is_mortgaged()
     self._is_mortgaged = True
     self.owner().entrust(self._mortgage) # type: ignore
@@ -133,7 +131,7 @@ class Property(Tile):
   
   def demortgage(self):
     '''Demortgages tile and deducts 110% of its mortgage fee from its owner.'''
-    assert self.has_owner()
+    assert self.owner() is not None
     assert self.is_mortgaged()
     self._is_mortgaged = False
     self.owner().deduct(int(self._mortgage * const.MORTGAGE_INTEREST_RATE)) # type: ignore
@@ -183,6 +181,10 @@ class Street(Property):
 
     self._tile_type = 'property'
   
+  def color_set(self) -> set[Street]:
+    '''Returns the set of streets on the board with the same color as this tile.'''
+    return self.board().color_set(self.color)
+
   def houses(self):
     '''Returns the amount of houses currently on the tile.
     
@@ -192,11 +194,11 @@ class Street(Property):
   def has_hotel(self): return self._has_hotel
 
   def mortgage(self):
-    assert self._houses == 0
+    assert all(property.houses() == 0 for property in self.color_set())
     super().mortgage()
 
-  def rent(self):
-    if not self.has_owner(): return 0
+  def rent(self) -> int:
+    if not self.owner() is not None: return 0
     if self.is_mortgaged(): return 0
 
     if self._has_hotel: return self._rent_with_hotel
@@ -211,6 +213,15 @@ class Street(Property):
     
     else: return self._starting_rent
 
+  def building_cost(self):
+    '''Returns the cost of building a building on the tile.'''
+    return self._hotel_cost if self.has_hotel() else self._house_cost
+  
+  def selling_bonus(self):
+    '''Returns the amount earned from selling a building on this tile.
+    It is half the building cost.'''
+    return self.building_cost()//2
+
   def build(self):
     '''Builds a house on the tile; or an hotel, in case there are 4 houses.
     
@@ -224,28 +235,26 @@ class Street(Property):
     
     A tile may not be built on further after having built an hotel on it.'''
 
-    assert self.has_owner()
+    assert self.owner() is not None
     assert self.owner().owns_color(self.color) # type: ignore
 
     assert all(not property.is_mortgaged()
-      for property in self.board().color(self.color))
+      for property in self.color_set())
     assert self.houses() <= 4
 
-    assert all(
-      property.houses() >= self.houses()
-      for property in self.board().color(self.color) #do we have to check if it is mortgage
+    assert all(property.houses() >= self.houses()
+      for property in self.color_set()
     )
 
-    if self.houses() == 4: # build hotel
-      self.owner().deduct(self._hotel_cost) # type: ignore
-      self._has_hotel = True
-
-    else: self.owner().deduct(self._house_cost) # type: ignore
-
+    if self.houses() == 4: self._has_hotel = True
     self._houses += 1
 
+    assert self.owner().balance() >= self.building_cost() # type: ignore
+    self.owner().deduct(self.building_cost()) # type: ignore
+
     self.board().draw()
-    print(f'''{self.owner().name()} has built on {self.name()}. The tile now has {'an hotel' if self.has_hotel() else str(self._houses) + ' houses'}.''')
+    print(f'{self.owner()} has built on {self}. The tile now has',
+      'an hotel' if self.has_hotel() else (str(self._houses) + ' houses.'))
 
   def sell(self):
     '''Sells a single house (or hotel) on the tile for half its price,
@@ -256,24 +265,24 @@ class Street(Property):
     want to sell on. An hotel may always be sold.
     
     Cannot sell if there are no houses on the tile.'''
-    assert self.has_owner()
+    assert self.owner() is not None
     assert self.owner().owns_color(self.color) # type: ignore
   
     assert self.houses() > 0, 'No houses left to sell'
 
     assert all(
       property.houses() <= self.houses()
-      for property in self.board().color(self.color) if not property.is_mortgaged()
-    )
+      for property in self.color_set() if not property.is_mortgaged()
+    ) 
 
-    if self._has_hotel:
-      self.owner().entrust(self._hotel_cost//2) # type: ignore
-      self._has_hotel = False
+    if self._has_hotel: self._has_hotel = False
 
-    else: self.owner().entrust(self._house_cost//2) # type: ignore
-
+    self.owner().entrust(self.selling_bonus()) # type: ignore
     self._houses -= 1
+
     self.board().draw()
+    print(f'{self.owner()} has sold on {self}. The tile now has',
+      'an hotel' if self.has_hotel() else (str(self._houses) + ' houses.'))
 
   def reset(self):
     '''Resets property so that it may be claimed again. Removes all houses and
@@ -327,10 +336,12 @@ class Utility(Property):
     self._tile_type = 'utility'
   
   def rent(self) -> int:
-    if not self.has_owner(): return 0
+    if self.owner() is None: return 0
 
     self.board().throw_dice()
-    return sum(self.board().dice()) * (self._default_multiplier if self.owner().utility_count() == 1 else self._multiplier_with_both)
+    return sum(self.board().dice()) * (
+      self._default_multiplier if self.owner().utility_count() == 1 else self._multiplier_with_both # type: ignore
+      )
 
 def build_tile(board: Board, data: dict[str, Any]) -> Tile:
   tile_type = data['type']

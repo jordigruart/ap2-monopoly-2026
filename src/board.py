@@ -4,7 +4,7 @@ from typing import Iterable
 
 import pickle, json
 from player import Player, build_player
-from tile import Tile, Street, build_tile
+from tile import Tile, Property, Street, build_tile
 from draw import draw
 from deck import Deck
 from card import Card
@@ -49,14 +49,20 @@ class Board:
 
     self._image_counter = 0
 
-  def players(self) -> list[Player]: return self._players
+  def players(self) -> list[Player]:
+    '''Returns the players in the order in which they play, starting with the
+    one whose turn it first ever is. This includes players who are eliminated.'''
+    return self._players
+  
   def current_player(self) -> Player: return self.players()[self._index]
   def tiles(self) -> list[Tile]: return self._tiles
   def dice(self) -> tuple[int, int]: return self._dice
 
-  def num_players(self) -> int: return len(self.players())
+  def active_players(self) -> int: 
+    '''Returns how many players are currently in the game (i.e. not eliminated).'''
+    return sum(1 for player in self.players() if not player.is_bankrupt())
 
-  def color(self, color: str) -> set[Street]:
+  def color_set(self, color: str) -> set[Street]:
     '''Returns the set of streets on the board with the specified color.'''
     return self._colors[color]
   
@@ -85,64 +91,77 @@ class Board:
     self._image_counter += 1
 
   def _make_way_for_next_player(self) -> None:
-    '''Makes way for next player.'''
+    '''Makes way for next player so that they may play next turn.'''
     self._straight_doubles = 0
     self._index += 1
-    self._index %= self.num_players()
+    self._index %= const.MAX_PLAYERS
 
   def _prison_routine(self):
+    '''Handles turn behavior when the player is in jail.
+    
+    If the player has a get out of jail free card, they are prompted to use it.
+    Otherwise, they are made to roll their dice, and are only freed if they
+    roll doubles, which they use to start their turn (i.e. they do not roll
+    again). This double means they may play again next turn. It counts towards
+    the three doubles that lead to imprisonment as well.'''
     assert self.current_player().is_in_prison()
 
-    if self.current_player().turns_in_prison() == 3:
-      self.current_player().free()
-      return
-
-    self.throw_dice()
-    if self.dice()[0] == self.dice()[1]:
-      self.current_player().free()
-      return
+    self.current_player().log_a_turn_in_prison()
     
     if self.current_player().get_out_of_jail_free_cards() > 0:
       self.current_player().prompt_use_goojfc()
       return
     
-    self.current_player().log_a_turn_in_prison()
-    raise const.EndTurn
+    self.throw_dice()
+    if self.dice()[0] == self.dice()[1]:
+      self.current_player().free()
+      return
 
   def _play_turn(self):
-    if self.current_player().is_bankrupt(): raise const.EndTurn
+    if self.current_player().is_bankrupt():
+      self._make_way_for_next_player()
+      return
 
     self._turn_accumulator += 1
     print(f'TURN {self._turn_accumulator}: {self.current_player()}\'s turn')
 
     if self.current_player().is_in_prison(): self._prison_routine()
-    
-    self.throw_dice()
+    else: self.throw_dice()
 
-    self._handle_doubles()
-    self.current_player().move_forward(sum(self.dice()))
-    
-    self.draw()
+    if not self.current_player().is_in_prison(): # this may happen if the player got out of prison
+      self._handle_doubles()
+      self.current_player().move_forward(sum(self.dice()))
+      
+      self.draw()
 
-    current_tile = self.tiles()[self.current_player().position()]
+      current_tile = self.tiles()[self.current_player().position()]
 
-    print(f'{self.current_player()} has landed on {current_tile}')
-    current_tile.land_on(self.current_player())
+      print(f'{self.current_player()} has landed on {current_tile}')
+      current_tile.land_on(self.current_player())
+
+      if self.current_player().is_bankrupt():
+        self.current_player().eliminate(
+          creditor = current_tile.owner() if isinstance(current_tile, Property) else None)
+        self._make_way_for_next_player()
+        return
 
     self.current_player().post_turn_actions()
 
-    raise const.EndTurn
+    if self.current_player().turns_in_prison() == 3:
+      self.current_player().free()
+      return
+    
+    if not self._doubles: self._make_way_for_next_player()
+    return
   
   def play(self) -> None:
     '''Plays the game until only one player is standing. Progressively
     generates illustrations of the board state for every turn, which are stored
     in ./imgs'''
-    lim = 1000
-    for _ in range(lim):
+    lim = 50
+    while self._turn_accumulator <= lim and self.active_players() > 1:
       try: self._play_turn()
-      except const.EndTurn:
-        if (self._straight_doubles == 3
-          or not self._doubles): self._make_way_for_next_player()
+      except const.EndTurn: self._make_way_for_next_player()
 
 class DebugBoard(Board):
   '''Altered version of the normal board used for testing.
@@ -164,12 +183,12 @@ class DebugBoard(Board):
     self.draw()
   
   def play(self) -> None:
-    '''Runs game until die inputs end.'''
+    '''Runs game until die inputs end or a player wins.'''
     try: super().play()
     except StopIteration: print('Die rolls or cards finished. Stopping play')
 
   def run(self, turns: int) -> None:
-    '''Runs game for a limited number of turns.'''
+    '''Runs game for the specified number of turns.'''
     for _ in range(turns):
       try: self._play_turn()
       except const.EndTurn:
