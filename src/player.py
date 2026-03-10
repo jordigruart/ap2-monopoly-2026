@@ -214,7 +214,7 @@ class Player:
 
         else: return
 
-  def grant_property(self, property: Property):
+  def give_property_eliminated(self, property: Property):
     '''When a player is eliminated from play, they give all their mortgaged
     properties to the owner of the space that made them bankrupt. The reciever
     then must choose whether to repay the mortgage or keep it by paying 10% of
@@ -236,7 +236,7 @@ class Player:
     for property in self.owned_properties():
       if property.is_mortgaged():
         if creditor is None: property.reset()
-        else: creditor.grant_property(property)
+        else: creditor.entrust_property(property)
       else: property.reset()
 
     raise const.EndTurn
