@@ -13,8 +13,9 @@ def generate_slideshow(svgs: list[str]) -> str:
         return "<html><body><p>No SVGs to display</p></body></html>"
 
     # Escape SVG paths for JavaScript
-    escaped_paths = [path.replace("\\", "\\\\").replace("'", '') for path in svgs]
-    paths_js = "[\'imgs/" + ", \'imgs/".join(f"{path}'" for path in escaped_paths) + "]"
+    print(svgs)
+    escaped_paths = [path.replace("\\", "\\\\").replace("'", "\\'") for path in svgs]
+    paths_js = "[" + ", ".join(f"'imgs\\\\{path}'" for path in escaped_paths) + "]"
 
     html = f"""<!DOCTYPE html>
 <html>

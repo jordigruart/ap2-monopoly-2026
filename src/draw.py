@@ -470,7 +470,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
             f"⛓️ {player.turns_in_prison()}",
         ]
         info_text = " · ".join(info_parts)
-        text_kw = {"fill": "red"} if player.turns_in_prison() > 0 else {}
+        text_kw = {"fill": "red"} if player.is_in_prison() else {}
         d.append(
             dw.Text(info_text, 14, qx + pad, ty, font_family=FONT_FAMILY, **text_kw)
         )

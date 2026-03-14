@@ -4,7 +4,7 @@ from player import Player
 from tile import *
 
 from board import DebugBoard
-import const
+import const, aitools
 
 # testing movement
 def test_doubles():
@@ -12,6 +12,8 @@ def test_doubles():
     [(1, 1), (1, 2)]
   )
   jordi, mireia = board.players()[:2]
+
+  assert board.current_player() == jordi
 
   board.run(1)
   assert board.current_player() == jordi
@@ -64,7 +66,7 @@ def test_buy_property() -> DebugBoard:
   return board
 
 def test_rent_street_default():
-  '''Tests whether default rent (no color set or buildings) is charged properly
+  '''Tests that default rent (no color set or buildings) is charged properly
   on a street.'''
   board = test_buy_property()
   jordi, mireia = board.players()[:2]
@@ -83,6 +85,7 @@ def test_rent_street_default():
   )  
 
 def test_rent_street_mortgage() -> DebugBoard:
+  '''Tests that rent is not charged on a mortgaged property.'''
   board = test_buy_property()
   mireia = board.players()[1]
   whitechapel = board.tiles()[3]
@@ -95,6 +98,7 @@ def test_rent_street_mortgage() -> DebugBoard:
   return board
 
 def test_rent_street_demortgage():
+  '''Tests that rent is charged on a previously mortgaged property after being demortgaged.'''
   board = test_rent_street_mortgage()
   arnau = board.players()[2]
   whitechapel = board.tiles()[3]
@@ -104,21 +108,19 @@ def test_rent_street_demortgage():
   board.run(1) # arnau lands on whitehchapel; should be charged rent as it has been demortgaged
   assert arnau.balance() == const.START_MONEY - getattr(whitechapel, '_starting_rent')
 
-def test_rent_street_color_set():
-  '''Tests whether rent is charged properly on a street when its whole color
+def test_rent_street_color_set() -> DebugBoard:
+  '''Tests that rent is charged properly on a street when its whole color
   set is in one player's posession.'''
   board = DebugBoard(
-    die_inputs = [(-1, 1), (2, 1)]
+    die_inputs = [(-1, 1), (2, 1), (2, 1)]
   )
-  jordi = board.players()[0]
-  mireia = board.players()[1]
+  jordi, mireia = board.players()[:2]
   old_kent, tmp, whitechapel = board.tiles()[1:4]
-
-  board.run(1) # ending jordi's turn
-  for property in old_kent, whitechapel: jordi.buy(property) # giving jordi brown
-  
   assert isinstance(old_kent, Street) # for type checking
   assert isinstance(whitechapel, Street)
+
+  board.run(1)
+  for property in old_kent, whitechapel: jordi.buy(property)
 
   assert jordi.owns_color('brown')
 
@@ -128,15 +130,34 @@ def test_rent_street_color_set():
     const.START_MONEY
     - getattr(old_kent, '_price')
     - getattr(whitechapel, '_price')
-    + getattr(whitechapel, '_rent_with_color_set')
+    + getattr(whitechapel, '_color_set_rents')[0] # rent charged with color set and 0 houses
   )
   assert mireia.balance() == (
-    const.START_MONEY - getattr(whitechapel, '_rent_with_color_set')
+    const.START_MONEY - getattr(whitechapel, '_color_set_rents')[0] # rent charged with color set and 0 houses
+  )
+
+  return board
+
+def test_rent_street_color_set_with_mortgage():
+  '''Tests that color set rent is also applied even when a property in the set
+  is mortgaged.'''
+  board = test_rent_street_color_set() # jordi owns the brown color set and it is arnau's turn
+  arnau = board.players()[2]
+  old_kent, tmp, whitechapel = board.tiles()[1:4]
+  assert isinstance(old_kent, Street) # for type checking
+  assert isinstance(whitechapel, Street)
+
+  old_kent.mortgage()
+  board.run(1) # arnau lands on whitechapel
+
+  assert old_kent.is_mortgaged()
+  assert arnau.balance() == (
+    const.START_MONEY - getattr(whitechapel, '_color_set_rents')[0]
   )
 
 def test_rent_street_houses():
-  '''Tests whether rent is charged properly on a street when there are houses
-  built on it.'''
+  '''Tests that rent is charged properly on a street when there are houses
+  built on it, for one to four houses.'''
   for i in range(1, 5):
     board = DebugBoard(
       die_inputs = [(-1, 1), (2, 1)]
@@ -147,23 +168,24 @@ def test_rent_street_houses():
     assert isinstance(old_kent, Street) # for type checking
     assert isinstance(whitechapel, Street) # for type checking
 
-    board.run(1) # if we gave jordi any properties before he ended his turn the ai
+    board.run(1) # if we gave jordi any properties before he ended his turn, the ai
     # would build stuff on its own, which we dont want
 
     for property in old_kent, whitechapel: jordi.buy(property)
 
-    jordi.entrust(10000) # we dont want the ai running out of money
+    jordi.entrust(10000) # we dont want the ai running out of money either
     whitechapel.build()
     for _ in range(i - 1): old_kent.build(); whitechapel.build()
     assert whitechapel.houses() == i
 
     board.run(1) # mireia lands on whitechapel and pays the corresponding rent
     assert mireia.balance() == (
-      const.START_MONEY - getattr(whitechapel,
-      f'_rent_with_{i}_house' + ('s' if i > 1 else ''))
+      const.START_MONEY - getattr(whitechapel, '_color_set_rents')[i]
     )
 
 def test_street_rent_hotel():
+  '''Tests that rent is charged properly on a street when there is an hotel
+  built on it.'''
   board = DebugBoard(
     die_inputs = [(-1, 1), (2, 1)]
   )
@@ -187,7 +209,7 @@ def test_street_rent_hotel():
     const.START_MONEY - getattr(whitechapel, '_rent_with_hotel')
   )
 
-def test_rent_station():
+def test_rent_station(): #TODO
   board = DebugBoard(
     die_inputs = [
       (5, 0), (5, 0), (-1, 1), (-1, 1),
@@ -235,6 +257,7 @@ def test_rent_station():
   )
 
 def test_rent_utilities_one_utility():
+  '''Tests that rent is charged properly on an utility tile when it is.'''
   board = DebugBoard(
     die_inputs = [(12, 0), (12, 0), (1, 2)]
   )
@@ -271,7 +294,7 @@ def test_rent_utilities_two_utilities():
 
   board.play()
   # jordi lands on electric company and buys it
-  # jordi plays again; this time, he lands on water company and buys it
+  # jordi plays again; this time, he lands on water works and buys it
   # mireia lands on electric company and rolls 1, 2 for its rent
   # mireia should have lost 3*multiplier with both
   assert mireia.balance() == (
@@ -331,6 +354,7 @@ def test_building_orderly() -> DebugBoard:
   return board
 
 def test_selling_orderly():
+  '''Tests that selling in order works.'''
   board = test_building_orderly()
   regent, oxford, tmp, bond = board.tiles()[31:35]
   assert isinstance(regent, Street) # ty
@@ -340,8 +364,8 @@ def test_selling_orderly():
   oxford.sell(); bond.sell(); regent.sell(); bond.sell()
   oxford.sell(); oxford.sell(); bond.sell(); regent.sell()
 
-def test_building_on_the_same_tile_twice_in_a_row_does_not_work():
-  '''Tests whether building in an unorderly fashion does not work.'''
+def test_building_unorderly():
+  '''Tests that building on the same tile twice in a row does not work.'''
   with pytest.raises(AssertionError):
     board = DebugBoard(
       die_inputs = [(-1, 1)]
@@ -352,13 +376,13 @@ def test_building_on_the_same_tile_twice_in_a_row_does_not_work():
     board.play()
 
     jordi.entrust(19000)
-    for property in board.color_set('green'): property.set_owner(jordi)
+    for property in board.color_set('green'): jordi.buy(property)
 
     assert isinstance(regent, Street)
     for _ in range(2): regent.build()
 
 def test_ai_builds_properly_from_zero():
-  '''Tests whether the player AI knows how to build from 0 houses on a set to
+  '''Tests that the player AI knows how to build from 0 houses on a set to
   three hotels granted unlimited funds.'''
   board = DebugBoard(
     die_inputs = [(5, 5), (-1, 1)]
@@ -375,6 +399,8 @@ def test_ai_builds_properly_from_zero():
   assert all(property.has_hotel() for property in board.color_set('green'))
 
 def test_ai_builds_properly_from_a_start() -> DebugBoard:
+  '''Tests that the player AI knows how to build from an already present amount
+  of houses on a set to three hotels granted unlimited funds.'''
   board = DebugBoard(
     die_inputs = [(5, 5), (-1, 1)]
   )
@@ -384,31 +410,32 @@ def test_ai_builds_properly_from_a_start() -> DebugBoard:
   assert isinstance(oxford, Street)
   assert isinstance(bond, Street)
 
-  board.run(1)
+  board.run(1) # the board wont be drawn properly if we dont roll jordi's dice first
 
   jordi.entrust(100000)
   for property in board.color_set('green'): jordi.buy(property)
 
   regent.build(); oxford.build()
 
-  board.play() # the ai will now buy until there is an hotel on every tile
+  board.play() # the ai will now buy until it cant anymore
+  # (i.e. until there is an hotel on every green tile)
   assert all(property.has_hotel() for property in board.color_set('green'))
 
   return board
 
 def test_ai_sells_properly_from_all():
-  '''Tests whether the player AI knows how to empty a color set from hotels to mortgaged
+  '''Tests that the player AI knows how to empty a color set; from hotels, to mortgaged
   properties.'''
   board = test_ai_builds_properly_from_a_start()
   jordi = board.players()[0]
 
-  jordi._money = -10000
-  jordi._selling_actions() # ai will attempt to go over 0
+  jordi.__setattr__('_money', -10000)
+  aitools._run_selling_actions(jordi) # ai will now attempt to go over 0
   assert all(property.is_mortgaged() for property in board.color_set('green'))
 
 # testing prison
 def test_three_turns_in_prison():
-  '''Tests whether spending three turns in prison takes you out of the game.'''
+  '''Tests that spending three turns in prison takes you out of jail.'''
   board = DebugBoard(
     die_inputs =[
       (0, 30), (-1, 1), (-1, 1), (-1, 1), # (0, 30) places Jordi at Go to Jail
@@ -439,10 +466,13 @@ def test_three_turns_in_prison():
   assert not jordi.is_in_prison()
   assert jordi.turns_in_prison() == 0
 
+  assert board.current_player() is not jordi # next player after he is freed should be mireia
+
 def test_get_out_of_jail_free():
-  assert True
+  ...
 
 def test_roll_doubles_to_get_out_of_jail():
+  '''Tests that getting out of jail with doubles works properly.'''
   board = DebugBoard(
   die_inputs =[
     (0, 30), (-1, 1), (-1, 1), (-1, 1),
@@ -458,4 +488,3 @@ def test_roll_doubles_to_get_out_of_jail():
   assert not jordi.is_in_prison()
   assert jordi.position() == board.jail_position() + 4 # result is used for next player's move according to official rules
   assert board.current_player() == jordi # jordi should play another turn
-

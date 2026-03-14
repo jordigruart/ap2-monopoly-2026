@@ -58,11 +58,13 @@ class Player:
   def get_out_of_jail_free_cards(self) -> int: return self._get_out_of_jail_free_cards
 
   def imprison(self) -> None: 
-    '''Sends player to jail and draws the board. Does not apply GO bonus.'''
-    self.set_position(self._board.jail_position(), go_bonus = False)
+    '''Sends player to jail. Ends turn prematurely by raising const.EndTurn,
+    which is handled by board.play(). Does not apply GO bonus.
+    
+    Board-drawing: this function draws the board.'''
     self._in_prison = True
     self._turns_in_prison = 0
-    self.board().draw()
+    self.set_position(self._board.jail_position(), go_bonus = False)
     print(f'{self} has gone to jail')
     raise const.EndTurn
 
@@ -79,8 +81,7 @@ class Player:
       self._get_out_of_jail_free_cards -= 1
 
   def log_a_turn_in_prison(self) -> None:
-    '''Increments internal count of amount of contiguous turns spent in prison
-    by one.'''
+    '''Increments count of amount of contiguous turns spent in prison by one.'''
     self._turns_in_prison += 1
 
   def station_count(self) -> int:
@@ -120,34 +121,47 @@ class Player:
     '''Moves player forward by the increment.
     
     If go_bonus is True, automatically applies the bonus given by passing the GO square if
-    the resulting position passes the square'''
+    the resulting position passes the square.
+    
+    Board-drawing: this function draws the board.'''
     self._position += increment
-    if go_bonus and self._position >= 40:
+    if self._position >= 40:
       self._position %= 40
-      self._money += const.GO_SALARY
+      if go_bonus: self._money += const.GO_SALARY
+
+    self.board().draw()
       
   def move_backwards(self, decrement: int, go_bonus: bool = False) -> None:
     '''Moves player backwards by the decrement.
     
-    If go_bonus is True, automatically applies the bonus given by passing the GO square.'''
+    If go_bonus is True, automatically applies the bonus given by passing the GO square
+    
+    Board-drawing: this function draws the board.'''
     self._position -= decrement
-    if go_bonus and self._position <= 0:
+    if self._position <= 0:
       self._position %= 40
-      self._money += const.GO_SALARY
+      if go_bonus: self._money += const.GO_SALARY
+    
+    self.board().draw()
 
   def set_position(self, position: int, go_bonus: bool = False) -> None:
     '''Moves player to the specified position.
      
     If go_bonus is True, automatically applies the bonus given by passing the
     GO square if the destination is before the origin (as if the player had had
-    to move forward to get there).'''
+    to move forward to get there).
+    
+    Board-drawing: this function draws the board.'''
     if go_bonus and position <= self._position: self._money += const.GO_SALARY
     self._position = position
   
+    self.board().draw()
+  
   def entrust_property(self, property: Property):
-    '''Gives the specified property to this player and draws the board. Changes all the
-    internal variables that handle ownership, both in the player and in the
-    tile.'''
+    '''Gives the specified property to this player. Changes all the internal
+    variables that handle ownership, both in the player and in the tile.
+    
+    Board-drawing: this function draws the board.'''
     property.__setattr__('_owner', self)
 
     match property.tile_type():
@@ -161,58 +175,14 @@ class Player:
   def buy(self, property: Property):
     assert self.balance() >= property.price(), 'Insufficient funds'
     self.deduct(property.price())
+    self.entrust_property(property)
 
     print(f'{self.name()} has bought {property.name()}')
   
   def prompt_buy(self, property: Property):
-    '''Prompts a player to buy.'''
-    if (self.balance() >= const.UPPER_SPENDING_THRESHOLD
-    and self.balance() >= property.price()): self.buy(property)
-
-
-  def post_turn_actions(self):
-    if self.balance() < const.LOWER_SPENDING_THRESHOLD:
-      self._selling_actions()
-
-    if self.balance() >= const.UPPER_SPENDING_THRESHOLD:
-      self._buying_actions()
-
-  def _selling_actions(self):
-    '''Tries to go above spending threshold.'''
-    # sell buildings
-    for color in filter(self.owns_color, const.COLORS):
-      color = self.board().color_set(color)
-
-      for property in aitools.selling_order(color):
-        property.sell()
-        if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
+    '''Prompts a player to buy a property.'''
+    if (self.balance() >= max(const.SPENDING_THRESHOLD, self.balance() >= property.price())): self.buy(property)
     
-    # if still critical, mortgage until not
-    for property in self.owned_properties():
-      if not property.is_mortgaged():
-        property.mortgage()
-        if self.balance() >= const.LOWER_SPENDING_THRESHOLD: return
-
-  def _buying_actions(self):
-    '''Tries to go below spending threshold.'''
-    # demortgage first
-    for property in filter(Property.is_mortgaged, self.owned_properties()):
-      if self.balance() >= property.demortgage_fee():
-        property.demortgage()
-        if self.balance() < const.UPPER_SPENDING_THRESHOLD: return
-
-      else: return
-    
-    # if still can buy, buy until you cant
-    for color in filter(self.owns_color, reversed(const.COLORS)):
-      color = self.board().color_set(color)
-
-      for property in aitools.buying_order(color):
-        if self.balance() >= property.building_cost():
-          property.build()
-          if self.balance() < const.LOWER_SPENDING_THRESHOLD: return
-
-        else: return
 
   def recieve_property_from_elimination(self, property: Property):
     '''When a player is eliminated from play, they give all their mortgaged
@@ -223,23 +193,27 @@ class Player:
     This function changes the property's owner and handles that choice.'''
     assert property.is_mortgaged()
     self.entrust_property(property)
+    
     if (self.balance() >= property.demortgage_fee()
-      and self.balance() >= const.LOWER_SPENDING_THRESHOLD): property.demortgage()
+      and self.balance() >= const.SPENDING_THRESHOLD): property.demortgage()
     else: self.deduct(int(.1 * property.mortgage_bonus()))
 
     if self.is_bankrupt(): self.eliminate(None)
 
   def eliminate(self, creditor: Player | None) -> None:
     '''Eliminates self from play. Gives all GOOJF cards and all mortgaged
-    properties to creditor, or frees them if'''
-    # for now this goes to the bank and not to the player that is lost to
+    properties to creditor and takes away the rest of their properties. If creditor is
+    None, theyre.
+    
+    Board-drawing: This function draws the board after eliminating the player.'''
     for property in self.owned_properties():
       if property.is_mortgaged():
         if creditor is None: property.reset()
         else: creditor.recieve_property_from_elimination(property)
       else: property.reset()
-
-    raise const.EndTurn
+    
+    for attr in self._utilities, self._streets, self._stations: attr.clear()
+    self.board().draw()
 
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
   """Build a Player from JSON-like dict with 'name', 'piece', and 'color' keys."""

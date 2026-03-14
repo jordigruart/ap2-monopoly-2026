@@ -32,7 +32,12 @@ class Tile:
     '''Handle what happens when a player lands on this tile. Do nothing by
     default.
     
-    Note: GO bonus already handled by player.py's movement methods.'''
+    Note: GO bonus already handled by player.py's movement methods.
+
+    Board-drawing: this function only draws the board if something substantial
+    happens when the tile is landed on. Tiles that do not have any
+    interesting behavior (Free Parking, Go, Just Visiting) do not cause the
+    board to be redrawn.'''
     if 'Go To Jail' in self.name(): player.imprison()    
     else: pass 
 
@@ -121,12 +126,15 @@ class Property(Tile):
     bonus, which is half its price by definition.
     
     If the tile is a street, there must be no houses or hotels on the tile in
-    order to be mortgaged.'''
+    order to be mortgaged.
+    
+    Board-drawing: This function draws the board.'''
     assert self.owner() is not None
     assert not self.is_mortgaged()
     self._is_mortgaged = True
     self.owner().entrust(self._mortgage) # type: ignore
 
+    print(f'{self.owner()} has mortgaged {self}')
     self.board().draw()
   
   def demortgage(self):
@@ -140,11 +148,7 @@ class Property(Tile):
 
 class Street(Property):
   _starting_rent: int
-  _rent_with_color_set: int
-  _rent_with_1_house: int
-  _rent_with_2_houses: int
-  _rent_with_3_houses: int
-  _rent_with_4_houses: int
+  _color_set_rents: list[int] # contains rent with color set and 0 houses, 1 houses, etc.
   _rent_with_hotel: int
 
   _house_cost: int
@@ -166,11 +170,8 @@ class Street(Property):
     self.color = color
 
     self._starting_rent = starting_rent
-    self._rent_with_color_set = rent_with_color_set
-    self._rent_with_1_house = rent_with_1_house 
-    self._rent_with_2_houses = rent_with_2_houses 
-    self._rent_with_3_houses = rent_with_3_houses 
-    self._rent_with_4_houses = rent_with_4_houses 
+    self._color_set_rents = [rent_with_color_set] + [rent_with_1_house, rent_with_2_houses,
+      rent_with_3_houses, rent_with_4_houses]
     self._rent_with_hotel = rent_with_hotel 
 
     self._house_cost = house_cost 
@@ -198,18 +199,11 @@ class Street(Property):
     super().mortgage()
 
   def rent(self) -> int:
-    if not self.owner() is not None: return 0
+    if self.owner() is None: return 0
     if self.is_mortgaged(): return 0
 
     if self._has_hotel: return self._rent_with_hotel
-    if self.owner().owns_color(self.color): # type: ignore
-      match self._houses:
-        case 0: return self._rent_with_color_set
-        case 1: return self._rent_with_1_house
-        case 2: return self._rent_with_2_houses
-        case 3: return self._rent_with_3_houses
-        case 4: return self._rent_with_4_houses
-        case _: raise ValueError('Too many houses')
+    if self.owner().owns_color(self.color): return self._color_set_rents[self._houses]
     
     else: return self._starting_rent
 
@@ -273,7 +267,7 @@ class Street(Property):
     assert all(
       property.houses() <= self.houses()
       for property in self.color_set() if not property.is_mortgaged()
-    ) 
+    )  
 
     if self._has_hotel: self._has_hotel = False
 
@@ -292,10 +286,7 @@ class Street(Property):
     self._has_hotel = False
 
 class Station(Property):
-  _starting_rent: int
-  _rent_with_2_stations: int
-  _rent_with_3_stations: int
-  _rent_with_4_stations: int
+  _rents: list[int] # contains rent with 1 station, rent with 2 stations, etc...
 
   def __init__(self, board: Board, position: int, name: str,
     price: int, mortgage: int,
@@ -305,20 +296,13 @@ class Station(Property):
   ):
     super().__init__(board, position, name, price, mortgage)
     
-    self._starting_rent = starting_rent
-    self._rent_with_2_stations = rent_with_2_stations
-    self._rent_with_3_stations = rent_with_3_stations
-    self._rent_with_4_stations = rent_with_4_stations
-
+    self._rents = [0, starting_rent, rent_with_2_stations, rent_with_3_stations, rent_with_4_stations]
+    
     self._tile_type = 'station'
   
   def rent(self) -> int:
-    match self.owner().station_count(): # type: ignore
-      case 1: return self._starting_rent
-      case 2: return self._rent_with_2_stations
-      case 3: return self._rent_with_3_stations
-      case 4: return self._rent_with_4_stations
-      case _: raise
+    if self.owner() is None: return 0
+    return self._rents[self.owner().station_count()]
 
 class Utility(Property):
   _default_multiplier: int
