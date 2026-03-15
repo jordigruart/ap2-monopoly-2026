@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Literal, Optional
-import const
+import const, aitools
+from deck import Deck
+from card import Card
 
 if TYPE_CHECKING:
   from board import Board
@@ -57,14 +60,19 @@ class Tax(Tile):
     self.board().draw()
 
 class DeckTile(Tile):
+  _deck: Deck
   def __init__(self, board: Board, position: int, name: str,
     tile_type: Literal['chance'] | Literal['community_chest']):
     super().__init__(board, position, name)
     
     self._tile_type = tile_type
+    self._deck = (
+      self.board()._chance_deck if tile_type == 'chance'
+      else self.board()._community_deck)
   
   def land_on(self, player: Player):
-    self.board().draw()
+    if len(self._deck) > 0: self._deck.pop().execute(player)
+    else: print("No cards left in the deck!")
 
 class Property(Tile):
   _price: int
@@ -109,17 +117,17 @@ class Property(Tile):
     self._is_mortgaged = False
     self._owner = None
   
-  def land_on(self, player: Player) -> None:
+  def land_on(self, player: Player, rent_multiplier: float = 1) -> None:
     if self.owner() is not None:
       if not self.is_mortgaged() and not player.owns(self):
-        rent = self.rent()
+        rent = rent_multiplier * self.rent()
 
         self.owner().entrust(player.deduct(rent)) # type: ignore
         print(f'{player} has paid ${rent} to {self.owner()}')
         self.board().draw()
 
     else:
-      player.prompt_buy(self)
+      aitools.prompt_buy(player, self)
 
   def mortgage(self):
     '''Mortgages tile, granting its owner the tile's corresponding mortgage

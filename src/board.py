@@ -1,44 +1,45 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
+import json, random, const, aitools, pickle
 
-import pickle, json
-from player import Player, build_player
-from tile import Tile, Property, Street, build_tile
-from draw import draw
 from deck import Deck
-from card import Card
+from draw import draw
 
-import random, const, aitools
+if TYPE_CHECKING:
+  from tile import Tile, Property, Street
+  from player import Player
+  from card import Card
 
 class Board:
   _tiles: list[Tile]
-  _colors: dict[str, set[Street]]
+  _color_sets: dict[str, set[Street]]
 
   def __init__(self):
     # We assume the items appear in the files in positional order, just
     # as they do in the files given to us.
     
+    # load decks
+    self._chance_deck = Deck(self, const.CHANCE_JSON_PATH)
+    self._community_deck = Deck(self, const.COMMUNITY_CHEST_JSON_PATH)
+
     # load tiles
-    self._tiles = list[Tile]()
-    self._colors = dict[str, set[Street]]()
+    self._tiles = []
+    self._color_sets = {}
     with open(const.TILES_JSON_PATH, encoding = 'UTF-8') as file:
+      from tile import build_tile
       for raw_tile in json.load(file):
         tile = build_tile(self, raw_tile)
         self._tiles.append(tile)
 
         if tile.tile_type() == 'property':
-          assert isinstance(tile, Street)
-  
-          if tile.color not in self._colors: self._colors[tile.color] = set[Street]()
-          self._colors[tile.color].add(tile)
-
-    # load decks
-    self._chance_deck = Deck(const.CHANCE_JSON_PATH)
-    self._community_deck = Deck(const.COMMUNITY_CHEST_JSON_PATH)
+          color = tile.color
+          if color not in self._color_sets: self._color_sets[color] = set()
+          self._color_sets[tile.color].add(tile)
 
     # load players
     with open(const.PLAYERS_JSON_PATH, encoding = 'UTF-8') as file:
+      from player import build_player
       players = json.load(file)
       self._players = [build_player(self, player, i) for i, player in enumerate(players)]
 
@@ -66,7 +67,7 @@ class Board:
 
   def color_set(self, color: str) -> set[Street]:
     '''Returns the set of streets on the board with the specified color.'''
-    return self._colors[color]
+    return self._color_sets[color]
   
   def jail_position(self) -> int: return 10
 
@@ -105,17 +106,18 @@ class Board:
     
     If the player has a get out of jail free card, they are prompted to use it.
     Otherwise, they are made to roll their dice, and are only freed if they
-    roll doubles, which they use to start their turn (i.e. they do not roll
-    again). This double means they may play again next turn. It counts towards
-    the three doubles that lead to imprisonment as well.'''
-    assert self.current_player().is_in_prison()    
-    if self.current_player().get_out_of_jail_free_cards() > 0:
-      self.current_player().prompt_use_goojfc()
+    roll doubles, which they must then use to move. This double means they may
+    play again next turn and counts towards the three doubles that lead to
+    imprisonment as well.'''
+    current_player = self.current_player()
+    assert current_player.is_in_prison()    
+    if current_player.get_out_of_jail_free_cards() > 0:
+      aitools.prompt_use_goojfc(current_player)
       return
     
     self.throw_dice()
     if self.dice()[0] == self.dice()[1]:
-      self.current_player().free()
+      current_player.free()
       return
 
 
@@ -173,7 +175,7 @@ class DebugBoard(Board):
   def __init__(
     self,
     die_inputs: Iterable[tuple[int, int]],
-    cards: Iterable[Card] = list[Card]()
+    cards: Iterable[Card] = []
   ):
     super().__init__()
     self._die_inputs = iter(die_inputs)

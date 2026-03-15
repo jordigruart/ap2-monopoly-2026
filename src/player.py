@@ -1,20 +1,29 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from tile import Street, Station, Utility, Property
 import const
-import aitools
 
 if TYPE_CHECKING:
   from board import Board
+  import aitools
+  from tile import Street, Station, Utility, Property
 
 class Player:
   _board: Board
   _name: str
   _piece: str
   _color: str
-  _index: int
-  _position: int
+  _index: int 
+
+  _position = 0
   _money: int
+
+  _in_prison: bool
+  _turns_in_prison: int
+  _get_out_of_jail_free_cards: int
+
+  _streets: set[Street]
+  _stations: set[Station]
+  _utilities: set[Utility]
 
   def __init__(
     self,
@@ -37,9 +46,9 @@ class Player:
     self._turns_in_prison = 0
     self._get_out_of_jail_free_cards = 0
 
-    self._streets = set[Street]()
-    self._stations = set[Station]()
-    self._utilities = set[Utility]()
+    self._streets = set()
+    self._stations = set()
+    self._utilities = set()
 
   def __str__(self) -> str: return self.name()
 
@@ -73,16 +82,11 @@ class Player:
     self._in_prison = False
     self._turns_in_prison = 0
     print(f'{self} has been freed from jail')
-  
-  def prompt_use_goojfc(self) -> None:
-    '''Prompts player to use a get out of jail free card.'''
-    if self._get_out_of_jail_free_cards > 0:
-      self.free()
-      self._get_out_of_jail_free_cards -= 1
 
   def log_a_turn_in_prison(self) -> None:
     '''Increments count of amount of contiguous turns spent in prison by one.'''
     self._turns_in_prison += 1
+  
 
   def station_count(self) -> int:
     '''Returns how many stations are currently in the player's posession.'''
@@ -95,6 +99,10 @@ class Player:
   def owned_properties(self) -> set[Property]:
     '''Returns the set of properties currently owned by the player.'''
     return self._streets | self._stations | self._utilities # type: ignore
+  
+  def owned_streets(self) -> set[Street]:
+    '''Returns the set of streets currently owned by the player.'''
+    return self._streets
 
   def owns(self, property: Property) -> bool:
     '''Returns whether the player owns the specified property.'''
@@ -157,6 +165,7 @@ class Player:
   
     self.board().draw()
   
+
   def entrust_property(self, property: Property):
     '''Gives the specified property to this player. Changes all the internal
     variables that handle ownership, both in the player and in the tile.
@@ -178,11 +187,6 @@ class Player:
     self.entrust_property(property)
 
     print(f'{self.name()} has bought {property.name()}')
-  
-  def prompt_buy(self, property: Property):
-    '''Prompts a player to buy a property.'''
-    if (self.balance() >= max(const.SPENDING_THRESHOLD, self.balance() >= property.price())): self.buy(property)
-    
 
   def recieve_property_from_elimination(self, property: Property):
     '''When a player is eliminated from play, they give all their mortgaged
@@ -194,10 +198,8 @@ class Player:
     assert property.is_mortgaged()
     self.entrust_property(property)
     
-    if (self.balance() >= property.demortgage_fee()
-      and self.balance() >= const.SPENDING_THRESHOLD): property.demortgage()
-    else: self.deduct(int(.1 * property.mortgage_bonus()))
-
+    aitools.decide_keep_or_demortgage(self, property)
+    # Keeping the property might have left the player bankrupt
     if self.is_bankrupt(): self.eliminate(None)
 
   def eliminate(self, creditor: Player | None) -> None:

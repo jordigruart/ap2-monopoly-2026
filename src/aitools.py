@@ -1,7 +1,11 @@
-from tile import Street, Property
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+from tile import Property
+from tile import Street
 from typing import Iterator
-from player import Player
 import const
+if TYPE_CHECKING: from player import Player
 
 def selling_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which buildings must be sold in a color
@@ -14,7 +18,7 @@ def selling_order(color: set[Street]) -> Iterator[Street]:
     if candidate.houses() > 0: yield candidate
     else: return
 
-def buying_order(color: set[Street]) -> Iterator[Street]:
+def building_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which to build buildings on a color set
   (according to the "build evenly" rule).'''
   while True:
@@ -38,7 +42,6 @@ def _run_selling_actions(player: Player):
   # sell buildings
   for color in filter(player.owns_color, const.COLORS):
     color = player.board().color_set(color)
-
     for property in selling_order(color):
       property.sell()
       if player.balance() >= const.SPENDING_THRESHOLD: return
@@ -54,21 +57,33 @@ def _run_buying_actions(player: Player):
   Board-drawing: this function draws the board for every property demortgaged
   and every building built.'''
   # we shall try demortgaging first
-  properties = filter(Property.is_mortgaged, player.owned_properties())
-  
-  property = next(properties, None)
-  while player.balance() >= const.SPENDING_THRESHOLD and property:
+  for property in filter(Property.is_mortgaged, player.owned_properties()):
     if player.balance() >= property.demortgage_fee(): property.demortgage()
-    property = next(properties, None)
+    if player.balance() < const.SPENDING_THRESHOLD: return
 
-  #do this better
-  colors = filter(player.owns_color, const.COLORS)
-  color_sets = (player.board().color_set(color) for color in colors)
-
-  for color_set in color_sets:
-    order = buying_order(color_set)
-
-    property = next(order)
-    while player.balance() >= const.SPENDING_THRESHOLD and property:
+  # if we can still spend, ai shall try to build
+  for color in filter(player.owns_color, const.COLORS):
+    color_set = player.board().color_set(color)
+    for property in building_order(color_set):
       if player.balance() >= property.building_cost(): property.build()
-      property = next(order)
+      if player.balance() < const.SPENDING_THRESHOLD: return
+
+def decide_keep_or_demortgage(player: Player, property: Property):
+  '''When a mortgaged property is recieved after elimination, the player must either remove the mortgage or keep it by paying a 10% of the mortgage.
+  The AI demortgages the property if the player is above the spending threshold and has the money, and keeps it otherwise.'''
+  if player.balance() >= max(property.demortgage_fee(), const.SPENDING_THRESHOLD): # demortgage
+    property.demortgage()
+  
+  else: # keep
+    player.deduct(int(.1 * property.mortgage_bonus()))
+
+def prompt_buy(player: Player, property: Property):
+  '''Prompts a player to buy a property.'''
+  if player.balance() >= max(const.SPENDING_THRESHOLD, property.price()):
+    player.buy(property)
+
+def prompt_use_goojfc(player: Player) -> None:
+  '''Prompts player to use a get out of jail free card.'''
+  if player.get_out_of_jail_free_cards() > 0:
+    player.free()
+    player._get_out_of_jail_free_cards -= 1

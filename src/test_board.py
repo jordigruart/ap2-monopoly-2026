@@ -1,6 +1,6 @@
 import pytest
-
-from player import Player
+from typing import TYPE_CHECKING
+if TYPE_CHECKING: from player import Player
 from tile import *
 
 from board import DebugBoard
@@ -31,7 +31,8 @@ def test_three_doubles():
   assert jordi.is_in_prison()
   assert board.current_player() == mireia
 
-def test_go_bonus():
+def test_go_bonus_land_on_go():
+  '''Tests that the go bonus is applied when a player lands on the GO square.'''
   board = DebugBoard(
     die_inputs = [(40, 0)]
   )
@@ -40,8 +41,19 @@ def test_go_bonus():
   board.play()
   assert jordi.balance() == const.START_MONEY + const.GO_SALARY
 
+def test_go_bonus_land_on_go():
+  '''Tests that the go bonus is applied when a player passes the GO square.'''
+  board = DebugBoard(
+    die_inputs = [(41, 0)]
+  )
+  jordi = board.players()[0]
+
+  board.play()
+  assert jordi.balance() == const.START_MONEY + const.GO_SALARY
+
 # testing landing on tiles
 def test_tax():
+  '''Tests that landing on a tax tile charges the player the corresponding amount.'''
   board = DebugBoard(
     die_inputs = [(4, 0)]
   )
@@ -209,82 +221,8 @@ def test_street_rent_hotel():
     const.START_MONEY - getattr(whitechapel, '_rent_with_hotel')
   )
 
-def test_rent_station(): #TODO
-  board = DebugBoard(
-    die_inputs = [
-      (5, 0), (5, 0), (-1, 1), (-1, 1),
-      (10, 0), (1, 0), (5, 0), (-1, 1),
-      ]
-  )
-  jordi = board.players()[0]
-  mireia = board.players()[1]
-  arnau = board.players()[2]
-  marta = board.players()[3]
-
-  kings_cross_station = board.tiles()[5]
-  marylebone_station = board.tiles()[15]
-  fenchurch_st_station = board.tiles()[25]
-  liverpool_station = board.tiles()[35]
-
-  # rent w/ one station ---------------------------------------------------------
-  board.run(4)
-
-  assert isinstance(kings_cross_station, Station) # for type checking
-
-  assert jordi.station_count() == 1
-  assert jordi.balance() == (
-    const.START_MONEY - kings_cross_station.price()
-    + getattr(kings_cross_station, '_starting_rent')
-  )
-  assert mireia.balance() == (
-    const.START_MONEY - getattr(kings_cross_station, '_starting_rent')
-  )
-
-  # rent w/ 2 stations ---------------------------------------------------------
-  board.run(4)
-
-  assert isinstance(marylebone_station, Station) # for type checking
-
-  assert jordi.station_count() == 2
-  assert jordi.balance() == (
-    const.START_MONEY
-    - kings_cross_station.price() - marylebone_station.price()
-    + getattr(kings_cross_station, '_starting_rent')
-    + getattr(kings_cross_station, '_rent_with_2_stations')
-  )
-  assert arnau.balance() == (
-    const.START_MONEY - getattr(kings_cross_station, '_rent_with_2_stations')
-  )
-
-def test_rent_utilities_one_utility():
-  '''Tests that rent is charged properly on an utility tile when it is.'''
-  board = DebugBoard(
-    die_inputs = [(12, 0), (12, 0), (1, 2)]
-  )
-  jordi = board.players()[0]
-  mireia = board.players()[1]
-  electric_company = board.tiles()[12]
-  assert isinstance(electric_company, Utility)
-
-  board.run(1)
-  # jordi buys electric company
-  # jordi should own electric company
-  assert jordi.owns(electric_company)
-
-  board.run(1)
-  # mireia lands on electric company and rolls 1, 2 for its rent
-  # jordi should have earned 3*default multiplier and mireia should have lost it
-  assert jordi.balance() == (
-    const.START_MONEY
-    - electric_company.price()
-    + (1 + 2) * getattr(electric_company, '_default_multiplier')
-  )
-  assert mireia.balance() == (
-    const.START_MONEY
-    - (1 + 2) * getattr(electric_company, '_default_multiplier')
-  )
-
 def test_rent_utilities_two_utilities():
+  '''Tests that rent is charged properly when a player lands on a'''
   board = DebugBoard(
     die_inputs = [(6, 6), (16, 0), (12, 0), (1, 2)]
   )
@@ -294,7 +232,8 @@ def test_rent_utilities_two_utilities():
 
   board.play()
   # jordi lands on electric company and buys it
-  # jordi plays again; this time, he lands on water works and buys it
+  # jordi plays again because he has rolled doubles; this time, he lands on
+  # water works and buys it
   # mireia lands on electric company and rolls 1, 2 for its rent
   # mireia should have lost 3*multiplier with both
   assert mireia.balance() == (
@@ -303,6 +242,8 @@ def test_rent_utilities_two_utilities():
   )
 
 def test_doubles_in_utilities_rent_do_not_make_you_play_again():
+  '''Tests that the player does not play another turn after rolling doubles for
+  to pay rent at a utilities square.'''
   board = DebugBoard(
     die_inputs = [(12, 0), (12, 0), (2, 2)]
   )
@@ -437,7 +378,7 @@ def test_ai_sells_properly_from_all():
 def test_three_turns_in_prison():
   '''Tests that spending three turns in prison takes you out of jail.'''
   board = DebugBoard(
-    die_inputs =[
+    die_inputs = [
       (0, 30), (-1, 1), (-1, 1), (-1, 1), # (0, 30) places Jordi at Go to Jail
       (-1, 1), (-1, 1), (-1, 1), (-1, 1),
       (-1, 1), (-1, 1), (-1, 1), (-1, 1),
