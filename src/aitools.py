@@ -1,11 +1,11 @@
 from __future__ import annotations
+from typing import Iterator, TYPE_CHECKING
 
-from typing import TYPE_CHECKING
-from tile import Property
-from tile import Street
-from typing import Iterator
 import const
-if TYPE_CHECKING: from player import Player
+from tile import Property
+if TYPE_CHECKING:
+  from player import Player
+  from tile import Street
 
 def selling_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which buildings must be sold in a color
@@ -26,7 +26,7 @@ def building_order(color: set[Street]) -> Iterator[Street]:
     if not candidate.has_hotel(): yield candidate
     else: return
 
-def post_turn_actions(player: Player):
+def post_turn_actions(player: Player) -> None:
   '''Tries to go above lower spending threshold.
   
   Board-drawing: this function draws the board for every change to the board.'''
@@ -34,8 +34,9 @@ def post_turn_actions(player: Player):
     _run_selling_actions(player)
   else: _run_buying_actions(player)
 
-def _run_selling_actions(player: Player):
-  '''Tries to go above lower spending threshold.
+def _run_selling_actions(player: Player) -> None:
+  '''Has player sell buildings and mortgage properties until unable to, or
+  until above or at spending threshold.
   
   Board-drawing: this function draws the board for every property mortgaged
   and every building sold.'''
@@ -51,26 +52,31 @@ def _run_selling_actions(player: Player):
     if not property.is_mortgaged(): property.mortgage()
     if player.balance() >= const.SPENDING_THRESHOLD: return
 
-def _run_buying_actions(player: Player):
-  '''Tries to go below upper spending threshold.
+def _run_buying_actions(player: Player) -> None:
+  '''Has player demortgage properties and build buildings until unable to, or
+  until below spending threshold.
   
   Board-drawing: this function draws the board for every property demortgaged
-  and every building built.'''
+  and for every building built.'''
   # we shall try demortgaging first
   for property in filter(Property.is_mortgaged, player.owned_properties()):
-    if player.balance() >= property.demortgage_fee(): property.demortgage()
     if player.balance() < const.SPENDING_THRESHOLD: return
+    if player.balance() >= property.demortgage_fee(): property.demortgage()
+    else: return
 
   # if we can still spend, ai shall try to build
   for color in filter(player.owns_color, const.COLORS):
     color_set = player.board().color_set(color)
     for property in building_order(color_set):
-      if player.balance() >= property.building_cost(): property.build()
       if player.balance() < const.SPENDING_THRESHOLD: return
+      if player.balance() >= property.building_cost(): property.build()
+      else: return
 
 def decide_keep_or_demortgage(player: Player, property: Property):
-  '''When a mortgaged property is recieved after elimination, the player must either remove the mortgage or keep it by paying a 10% of the mortgage.
-  The AI demortgages the property if the player is above the spending threshold and has the money, and keeps it otherwise.'''
+  '''When a mortgaged property is recieved after elimination, the player must
+  either remove the mortgage or keep it by paying a 10% of the mortgage. The
+  AI demortgages the property if the player is above the spending threshold
+  and has the money, and keeps it otherwise.'''
   if player.balance() >= max(property.demortgage_fee(), const.SPENDING_THRESHOLD): # demortgage
     property.demortgage()
   
@@ -78,12 +84,14 @@ def decide_keep_or_demortgage(player: Player, property: Property):
     player.deduct(int(.1 * property.mortgage_bonus()))
 
 def prompt_buy(player: Player, property: Property):
-  '''Prompts a player to buy a property.'''
+  '''Prompts player to buy property.
+  
+  Board-drawing: This function draws the board if player buys the property.'''
   if player.balance() >= max(const.SPENDING_THRESHOLD, property.price()):
     player.buy(property)
 
 def prompt_use_goojfc(player: Player) -> None:
   '''Prompts player to use a get out of jail free card.'''
-  if player.get_out_of_jail_free_cards() > 0:
+  if player.get_out_of_jail_free_cards > 0:
     player.free()
-    player._get_out_of_jail_free_cards -= 1
+    player.get_out_of_jail_free_cards -= 1

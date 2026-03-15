@@ -64,28 +64,39 @@ class Player:
 
   def is_in_prison(self) -> bool: return self._in_prison
   def turns_in_prison(self) -> int: return self._turns_in_prison
+
+  @property
   def get_out_of_jail_free_cards(self) -> int: return self._get_out_of_jail_free_cards
+
+  @get_out_of_jail_free_cards.setter
+  def get_out_of_jail_free_cards(self, new_val: int) -> None:
+    self._get_out_of_jail_free_cards = new_val
 
   def imprison(self) -> None: 
     '''Sends player to jail. Ends turn prematurely by raising const.EndTurn,
     which is handled by board.play(). Does not apply GO bonus.
     
     Board-drawing: this function draws the board.'''
+    print(f'{self} has gone to jail')
+
     self._in_prison = True
     self._turns_in_prison = 0
     self.set_position(self._board.jail_position(), go_bonus = False)
-    print(f'{self} has gone to jail')
     raise const.EndTurn
 
   def free(self) -> None:
     '''Frees a player from jail, allowing them to play normally.'''
-    self._in_prison = False
-    self._turns_in_prison = 0
     print(f'{self} has been freed from jail')
 
-  def log_a_turn_in_prison(self) -> None:
-    '''Increments count of amount of contiguous turns spent in prison by one.'''
-    self._turns_in_prison += 1
+    self._in_prison = False
+    self._turns_in_prison = 0
+
+  def update_prison_thing_TODO(self):
+    if self.is_in_prison():
+      self._turns_in_prison += 1
+      if self.turns_in_prison() == 3:
+        self.board().draw()
+        self.free()
   
 
   def station_count(self) -> int:

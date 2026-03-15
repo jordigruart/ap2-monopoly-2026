@@ -403,21 +403,20 @@ def draw_dice_in_current_player_box(d: dw.Drawing, board: Board) -> None:
             )
 
 
-def draw_center_icon(d: dw.Drawing) -> None:
-    """Draw a big icon in the center of the board."""
-    cx, cy = BOARD_SIZE / 2, BOARD_SIZE / 2 + 8
-    d.append(
-        dw.Text(
-            "🤑",
-            60,
-            cx,
-            cy,
-            text_anchor="middle",
-            dominant_baseline="middle",
-            font_family=FONT_FAMILY,
-        )
-    )
-
+# def draw_center_icon(d: dw.Drawing) -> None:
+#    """Draw a big icon in the center of the board."""
+#    cx, cy = BOARD_SIZE / 2, BOARD_SIZE / 2 + 8
+#    d.append(
+#        dw.Text(
+#            "🤑",
+#            60,
+#            cx,
+#            cy,
+#            text_anchor="middle",
+#            dominant_baseline="middle",
+#            font_family=FONT_FAMILY,
+#        )
+#    )
 
 def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) -> None:
     """Draw player info in four quadrants around the center of the board."""
@@ -466,7 +465,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
         ty += line_h
         info_parts = [
             f"💵 £{player.balance()}",
-            f"💳 {player.get_out_of_jail_free_cards()}",
+            f"💳 {player.get_out_of_jail_free_cards}",
             f"⛓️ {player.turns_in_prison()}",
         ]
         info_text = " · ".join(info_parts)
@@ -566,7 +565,7 @@ def draw(board: Board, svg_path: str, show_number: bool = False) -> None:
     draw_board_tiles(g, board, show_number)
     draw_houses_and_hotels(g, board)
     draw_player_circles(g, board, show_number)
-    draw_center_icon(g)
+    # draw_center_icon(g)
     draw_players_center(g, board, show_number)
     draw_dice_in_current_player_box(g, board)
     d.append(g)

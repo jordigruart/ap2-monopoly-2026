@@ -11,7 +11,7 @@ IMAGE_PATH = 'imgs/'
 DEBUG_IMAGE_PATH = 'debug/imgs/'
 
 MORTGAGE_INTEREST_RATE = 1.1 # rate applied to mortgage price when removed
-SPENDING_THRESHOLD = 0
+SPENDING_THRESHOLD = 40
 # A player will buy until some transaction puts them below this threshold and
 # sell until they are above or at the threshold.
 

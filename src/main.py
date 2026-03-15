@@ -4,7 +4,7 @@ from board import Board
 import random
 
 def main() -> None:
-  random.seed(30)
+  random.seed(2026)
   Board().play()
 
 if __name__ == "__main__":

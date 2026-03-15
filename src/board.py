@@ -6,15 +6,22 @@ import json, random, const, aitools, pickle
 from deck import Deck
 from draw import draw
 
+from tile import Property, Street
 if TYPE_CHECKING:
-  from tile import Tile, Property, Street
+  from tile import Tile
   from player import Player
   from card import Card
 
 class Board:
-  _tiles: list[Tile]
+
+  _tiles: list[Tile]; _players: list[Player]; _chance_deck: Deck; _community_deck: Deck
   _color_sets: dict[str, set[Street]]
 
+  _image_path: str
+
+  _image_counter: int; _index: int; _turn_accumulator: int
+
+  _dice: tuple[int, int]; _doubles: bool; _straight_doubles: int
   def __init__(self):
     # We assume the items appear in the files in positional order, just
     # as they do in the files given to us.
@@ -33,6 +40,7 @@ class Board:
         self._tiles.append(tile)
 
         if tile.tile_type() == 'property':
+          assert isinstance(tile, Street)
           color = tile.color
           if color not in self._color_sets: self._color_sets[color] = set()
           self._color_sets[tile.color].add(tile)
@@ -44,13 +52,11 @@ class Board:
       self._players = [build_player(self, player, i) for i, player in enumerate(players)]
 
     self._image_path = const.IMAGE_PATH
+    self._image_counter = 0
 
     self._turn_accumulator, self._index = 0, 0
-    self._is_playing = True
 
     self._straight_doubles = 0
-
-    self._image_counter = 0
 
   def players(self) -> list[Player]:
     '''Returns the players in the order in which they play, starting with the
@@ -60,6 +66,9 @@ class Board:
   def current_player(self) -> Player: return self.players()[self._index]
   def tiles(self) -> list[Tile]: return self._tiles
   def dice(self) -> tuple[int, int]: return self._dice
+
+  def chance_deck(self) -> Deck: return self._chance_deck
+  def community_deck(self) -> Deck: return self._community_deck
 
   def active_players(self) -> int: 
     '''Returns how many players are currently in the game (i.e. not eliminated).'''
@@ -76,7 +85,7 @@ class Board:
     
     Board-drawing: this function draws the board.'''
     self._dice = random.randint(1, 6), random.randint(1, 6)
-    print(f'{self.current_player()} rolled {self._dice}')
+    print(f'{self.current_player()} has rolled {self._dice}')
     self.draw()
 
   def _handle_doubles(self) -> None:
@@ -106,64 +115,55 @@ class Board:
     
     If the player has a get out of jail free card, they are prompted to use it.
     Otherwise, they are made to roll their dice, and are only freed if they
-    roll doubles, which they must then use to move. This double means they may
-    play again next turn and counts towards the three doubles that lead to
-    imprisonment as well.'''
+    roll doubles, which they must then use to move.'''
     current_player = self.current_player()
     assert current_player.is_in_prison()    
-    if current_player.get_out_of_jail_free_cards() > 0:
+    if current_player.get_out_of_jail_free_cards > 0:
       aitools.prompt_use_goojfc(current_player)
       return
     
     self.throw_dice()
     if self.dice()[0] == self.dice()[1]:
       current_player.free()
-      return
 
+  def _weird_not_prison_routine_TODO(self, player: Player):
+    '''either mention houw endturn is raised or check bankruptcy in the _play_turn instead'''
+    self._handle_doubles()
+    player.move_forward(sum(self.dice()))
+    
+    current_tile = self.tiles()[player.position()]
+    current_tile.land_on(player)
 
+    if player.is_bankrupt():
+      player.eliminate(
+        creditor = current_tile.owner() if isinstance(current_tile, Property) else None)
+      raise const.EndTurn
+  
   def _play_turn(self):
     current_player = self.current_player()
     if current_player.is_bankrupt():
       self._make_way_for_next_player()
       return
-
-    self._turn_accumulator += 1
-    print(f'TURN {self._turn_accumulator}: {current_player}\'s turn')
+    
+    else:
+      self._turn_accumulator += 1
+      print(f'TURN {self._turn_accumulator}: {current_player}\'s turn')
 
     if current_player.is_in_prison(): self._prison_routine()
     else: self.throw_dice()
 
     if not current_player.is_in_prison(): # player may have been freed
-      self._handle_doubles()
-      current_player.move_forward(sum(self.dice()))
-      
-      current_tile = self.tiles()[current_player.position()]
-
-      print(f'{current_player} has landed on {current_tile}')
-      current_tile.land_on(current_player)
-
-      if current_player.is_bankrupt():
-        current_player.eliminate(
-          creditor = current_tile.owner() if isinstance(current_tile, Property) else None)
-        self._make_way_for_next_player()
-        return
+      self._weird_not_prison_routine_TODO(current_player)
 
     aitools.post_turn_actions(current_player)
-
-    if current_player.is_in_prison():
-      current_player.log_a_turn_in_prison()
-      if current_player.turns_in_prison() == 3:
-        self.draw()
-        current_player.free()
-    
+    current_player.update_prison_thing_TODO()
     if not self._doubles: self._make_way_for_next_player()
-    return
   
   def play(self) -> None:
     '''Plays the game until only one player is standing. Progressively
     generates illustrations of the board state for every turn, which are stored
     in ./imgs'''
-    lim = 300
+    lim = 1000
     while self._turn_accumulator <= lim and self.active_players() > 1:
       try: self._play_turn()
       except const.EndTurn: self._make_way_for_next_player()

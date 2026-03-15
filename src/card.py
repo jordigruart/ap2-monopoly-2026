@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 import const
+from tile import Property
 
 if TYPE_CHECKING:
   from player import Player
   from board import Board
-  from tile import Property
 
 class Card:
   '''Base class for all cards.'''
@@ -46,7 +46,8 @@ class MoveToNearest(Card):
     position = self._nearest_position(player)
     player.set_position(position, True)
 
-    tile: Property = self._board.tiles()[position]
+    tile = self._board.tiles()[position]
+    assert isinstance(tile, Property)
     tile.land_on(player, self._rentMultiplier)
 
 class MoveToNearestStation(MoveToNearest):
@@ -80,7 +81,7 @@ class GetOutOfJailFreeCard(Card):
   _keep_card: bool
   def __init__(self, board: Board, **kwargs: Any) -> None: super().__init__(board, **kwargs)
   def execute(self, player: Player) -> None:
-    player._get_out_of_jail_free_cards += 1
+    player.get_out_of_jail_free_cards += 1
   
 # money related
 class CollectMoney(Card):
@@ -95,6 +96,7 @@ class CollectFromPlayers(Card):
   def execute(self, player: Player) -> None:
     for debtor in filter(lambda player: not player.is_bankrupt(), self._board.players()):
       player.entrust(debtor.deduct(self._amountPerPlayer))
+      if debtor.is_bankrupt(): debtor.eliminate(player)
   
 class PayMoney(Card):
   _amount: int

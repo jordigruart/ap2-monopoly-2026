@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Optional
 import const, aitools
 from deck import Deck
-from card import Card
 
 if TYPE_CHECKING:
   from board import Board
@@ -32,17 +31,18 @@ class Tile:
   def board(self) -> Board: return self._board
 
   def land_on(self, player: Player) -> None:
-    '''Handle what happens when a player lands on this tile. Do nothing by
-    default.
+    '''Handle what happens when player lands on this tile. By default, only
+    prints that the player has landed on the tile.
     
-    Note: GO bonus already handled by player.py's movement methods.
+    Note: GO bonus already handled by player.py's movement methods.'''
+    print(f'{player} has landed on {self}')
 
-    Board-drawing: this function only draws the board if something substantial
-    happens when the tile is landed on. Tiles that do not have any
-    interesting behavior (Free Parking, Go, Just Visiting) do not cause the
-    board to be redrawn.'''
+class Special(Tile):
+  def __init__(self, **kwargs: Any): super().__init__(**kwargs)
+  def land_on(self, player: Player):
+    super().land_on(player)
     if 'Go To Jail' in self.name(): player.imprison()    
-    else: pass 
+    else: pass
 
 class Tax(Tile):
   _amount: int
@@ -56,21 +56,24 @@ class Tax(Tile):
     self._tile_type = 'tax'
   
   def land_on(self, player: Player):
+    super().land_on(player)
     player.deduct(self._amount)
     self.board().draw()
 
 class DeckTile(Tile):
   _deck: Deck
+
   def __init__(self, board: Board, position: int, name: str,
     tile_type: Literal['chance'] | Literal['community_chest']):
     super().__init__(board, position, name)
     
     self._tile_type = tile_type
     self._deck = (
-      self.board()._chance_deck if tile_type == 'chance'
-      else self.board()._community_deck)
+      self.board().chance_deck() if tile_type == 'chance'
+      else self.board().community_deck())
   
   def land_on(self, player: Player):
+    super().land_on(player)
     if len(self._deck) > 0: self._deck.pop().execute(player)
     else: print("No cards left in the deck!")
 
@@ -118,6 +121,14 @@ class Property(Tile):
     self._owner = None
   
   def land_on(self, player: Player, rent_multiplier: float = 1) -> None:
+    '''Handles what happens when player lands on this tile. If the property is
+    unowned, it prompts the player AI to buy it. Else, the player is charged 
+    rent. Optionally, rent_multiplier may be given, which has the base rent
+    multiplied by the specified amount.
+    
+    Board-drawing: This function draws the board if the player is charged rent
+    or buys the property.'''
+    super().land_on(player)
     if self.owner() is not None:
       if not self.is_mortgaged() and not player.owns(self):
         rent = rent_multiplier * self.rent()
@@ -211,7 +222,7 @@ class Street(Property):
     if self.is_mortgaged(): return 0
 
     if self._has_hotel: return self._rent_with_hotel
-    if self.owner().owns_color(self.color): return self._color_set_rents[self._houses]
+    if self.owner().owns_color(self.color): return self._color_set_rents[self._houses] # type: ignore
     
     else: return self._starting_rent
 
@@ -267,7 +278,7 @@ class Street(Property):
     want to sell on. An hotel may always be sold.
     
     Cannot sell if there are no houses on the tile.'''
-    assert self.owner() is not None
+    assert self.owner()
     assert self.owner().owns_color(self.color) # type: ignore
   
     assert self.houses() > 0, 'No houses left to sell'
@@ -275,7 +286,7 @@ class Street(Property):
     assert all(
       property.houses() <= self.houses()
       for property in self.color_set() if not property.is_mortgaged()
-    )  
+    )
 
     if self._has_hotel: self._has_hotel = False
 
@@ -310,7 +321,7 @@ class Station(Property):
   
   def rent(self) -> int:
     if self.owner() is None: return 0
-    return self._rents[self.owner().station_count()]
+    return self._rents[self.owner().station_count()] # type: ignore
 
 class Utility(Property):
   _default_multiplier: int
@@ -366,6 +377,6 @@ def build_tile(board: Board, data: dict[str, Any]) -> Tile:
       board, data['position'], data['name'], data['amount']
     )
 
-    case _: return Tile(
-      board, data['position'], data['name']
+    case _: return Special(
+      board = board, position = data['position'], name = data['name']
     )
