@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Iterator, TYPE_CHECKING
 
-import const
 from tile import Property
+import const
 if TYPE_CHECKING:
   from player import Player
   from tile import Street
@@ -82,6 +82,7 @@ def decide_keep_or_demortgage(player: Player, property: Property):
   
   else: # keep
     player.deduct(int(.1 * property.mortgage_bonus()))
+    print(f'{player} has decided to keep {property}\'s mortgage.')
 
 def prompt_buy(player: Player, property: Property):
   '''Prompts player to buy property.

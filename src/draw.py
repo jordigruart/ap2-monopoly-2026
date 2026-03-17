@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
 import drawsvg as dw
-from tile import Tile, Property
 
 if TYPE_CHECKING:
+  from tile import Tile, Property
   from board import Board
 
 # Board dimensions: 1000x1000 total; player info in four quadrants at center
@@ -230,7 +230,6 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
             )
         # Owned properties: show owner number or piece in white at bottom right
         if tile.tile_type() in ("property", "station", "utility"):
-            assert isinstance(tile, Property)
             owner = tile.owner()
             if owner is not None:
                 if show_number:
@@ -304,6 +303,7 @@ def draw_player_circles(d: dw.Drawing, board: Board, show_number: bool = False) 
     radius = 16
     # Distribute circles so they don't overlap on same tile
     for i, player in enumerate(players):
+        if player.is_bankrupt(): continue
         cx, cy = tile_center(player.position())
         same_tile = [
             j for j, p in enumerate(players) if p.position() == player.position()

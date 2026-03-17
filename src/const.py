@@ -10,6 +10,8 @@ PLAYERS_JSON_PATH = "src/data/players.json"
 IMAGE_PATH = 'imgs/'
 DEBUG_IMAGE_PATH = 'debug/imgs/'
 
+SEED = 22 # 22
+
 MORTGAGE_INTEREST_RATE = 1.1 # rate applied to mortgage price when removed
 SPENDING_THRESHOLD = 40
 # A player will buy until some transaction puts them below this threshold and

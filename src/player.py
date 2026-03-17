@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import const
+import aitools
 
 if TYPE_CHECKING:
   from board import Board
-  import aitools
   from tile import Street, Station, Utility, Property
 
 class Player:
@@ -91,7 +91,11 @@ class Player:
     self._in_prison = False
     self._turns_in_prison = 0
 
-  def update_prison_thing_TODO(self):
+  def update_turns_in_prison(self):
+    '''Updates count of turns spent in prison.
+    If the player has spent three turns in prison, they are freed.
+    
+    Board-drawing: This function draws the board whenever the player is freed.'''
     if self.is_in_prison():
       self._turns_in_prison += 1
       if self.turns_in_prison() == 3:
@@ -226,6 +230,7 @@ class Player:
       else: property.reset()
     
     for attr in self._utilities, self._streets, self._stations: attr.clear()
+    print(f'{self} has been eliminated by {creditor}')
     self.board().draw()
 
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
