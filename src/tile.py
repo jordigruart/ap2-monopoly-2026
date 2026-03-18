@@ -60,7 +60,7 @@ class Tax(Tile):
   
   def land_on(self, player: Player):
     super().land_on(player)
-    player.deduct(self._amount)
+    player.deduct(self._amount, None)
     self.board().draw()
 
 class DeckTile(Tile):
@@ -69,18 +69,21 @@ class DeckTile(Tile):
   def __init__(self, tile_type: Literal['chance'] | Literal['community_chest'], **kwargs: Any):
     super().__init__(**kwargs)
     self._tile_type = tile_type
-    self._deck = (
-      self.board().chance_deck() if tile_type == 'chance'
-      else self.board().community_deck())
   
+  def deck(self):
+    return (
+      self.board().chance_deck() if self._tile_type == 'chance'
+      else self.board().community_deck())
+
   def land_on(self, player: Player):
     super().land_on(player)
-    card = self._deck.extract()
+
+    card = self.deck().extract()
     print(f'{player} has drawn {card.title}: {card.description}')
     card.execute(player)
-    self.board().draw()
 
 class Property(Tile):
+  '''Base class for ownable properties (Street, Station and Utility).'''
   _price: int;  _mortgage: int
   _owner: Optional[Player]; _is_mortgaged: bool
 
@@ -113,20 +116,22 @@ class Property(Tile):
     unowned, it prompts the player AI to buy it. Else, the player is charged 
     rent, unless they own the property. Optionally, rent_multiplier may be
     given, which has the base rent multiplied by the specified amount.
+
+    Runs elimination logic if player goes bankrupt.
     
     Board-drawing: This function draws the board if the player is charged rent
     or buys the property.'''
     super().land_on(player)
     if self.owner() is not None:
       if not self.is_mortgaged() and not player.owns(self):
-        rent = rent_multiplier * self.rent()
+        rent = int(rent_multiplier * self.rent())
 
-        self.owner().entrust(player.deduct(rent)) # type: ignore
+        player.deduct(rent, self.owner())
+        self.owner().entrust(rent) # type: ignore
         print(f'{player} has paid ${rent} to {self.owner()}')
         self.board().draw()
 
-    else:
-      aitools.prompt_buy(player, self)
+    else: aitools.prompt_buy(player, self)
 
   def mortgage(self):
     '''Mortgages tile, granting its owner the tile's corresponding mortgage
@@ -243,11 +248,8 @@ class Street(Property):
     
     if self.houses() == 4:
       self._has_hotel = True
-
     self._houses += 1
-
     self.owner().deduct(self.building_cost()) # type: ignore
-
     self.board().draw()
     print(f'{self.owner()} has built on {self}. The tile now has',
       'an hotel' if self.has_hotel() else (str(self._houses) + ' houses.'))
@@ -269,12 +271,9 @@ class Street(Property):
     assert all(
       property.houses() <= self.houses() for property in self.color_set() if not property.is_mortgaged()
     )
-
     if self._has_hotel:
       self._has_hotel = False
-
     self._houses -= 1
-
     self.owner().entrust(self.selling_bonus()) # type: ignore
     self.board().draw()
     print(f'{self.owner()} has sold on {self}. The tile now has {self._houses} houses.')
@@ -371,3 +370,15 @@ def build_tile(board: Board, data: dict[str, Any]) -> Tile:
     case _: return Special(
       board = board, position = data['position'], name = data['name']
     )
+
+'''
+def build_tile_potser(board: Board, **kwargs: Any) -> Tile:
+  # Preguntar a en Jordi Petit si això és bona pràctica
+  match kwargs['type']:
+    case 'property': type = Street
+    case 'utility': type = Utility
+    ...
+    case _: type = Special
+
+  return type.__init__(board, **kwargs)
+'''

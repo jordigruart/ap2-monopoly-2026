@@ -32,13 +32,19 @@ class Card:
 
 # movement related
 class GoToPosition(Card):
-  '''Advances to a certain position. Collects GO bonus.'''
+  '''Advances to a certain position and lands on tile.
+  Collects GO bonus.'''
   _position: int
   def __init__(self, position: int, **kwargs: Any) -> None:
     super().__init__(**kwargs)
     self._position = position
-  def execute(self, player: Player) -> None: player.set_position(self._position, True)
 
+  def execute(self, player: Player) -> None:
+    tile = self._board.tiles()[self._position]
+    player.set_position(self._position, True)
+
+    tile.land_on(player)
+  
 class MoveToNearest(Card):
   '''Advances to nearest instance of a certain tile type. The tile is landed on
   normally, but a multiplier (rentMultiplier) is applied to the rent charged.
@@ -79,7 +85,11 @@ class MoveBackSpaces(Card):
   def __init__(self, spaces: int, **kwargs: Any) -> None:
     super().__init__(**kwargs)
     self._spaces = spaces
-  def execute(self, player: Player) -> None: player.move_backwards(self._spaces, False)
+  def execute(self, player: Player) -> None:
+    player.move_backwards(self._spaces, False)
+
+    tile = self._board.tiles()[player.position()]
+    tile.land_on(player)
 
 # jail related
 class GoToJail(Card):
@@ -109,8 +119,8 @@ class CollectFromPlayers(Card):
   
   def execute(self, player: Player) -> None:
     for debtor in self._board.active_players():
-      player.entrust(debtor.deduct(self._amountPerPlayer))
-      if debtor.is_bankrupt(): debtor.eliminate(player)
+      player.entrust(self._amountPerPlayer)
+      debtor.deduct(self._amountPerPlayer)
   
 class PayMoney(Card):
   _amount: int
@@ -121,10 +131,6 @@ class PayMoney(Card):
   def execute(self, player: Player) -> None:
     player.deduct(self._amount)
 
-    if player.is_bankrupt(): 
-      player.eliminate(None)
-      raise const.EndTurn 
-
 class PayEachPlayer(Card):
   _amountPerPlayer: int
   def __init__(self, amountPerPlayer: int, **kwargs: Any) -> None:
@@ -132,12 +138,14 @@ class PayEachPlayer(Card):
     self._amountPerPlayer = amountPerPlayer
   
   def execute(self, player: Player) -> None:
-    for creditor in filter(lambda player: not player.is_bankrupt(), self._board.players()):
-      creditor.entrust(player.deduct(self._amountPerPlayer))
+    for creditor in self._board.active_players(): creditor.entrust(self._amountPerPlayer)
+    player.deduct(len(self._board.active_players()) * self._amountPerPlayer)
+    # this is done this way so that every player can be paid
+    # if a deduction were to be done after each payment, some players could end
+    # up not being paid because the player might have gone bankrupt
 
-    if player.is_bankrupt(): 
-      player.eliminate(None)
-      raise const.EndTurn 
+    # note how player is given the amount in the first line as well
+    # it is then deducted the amount in the second
 
 class PayPerProperty(Card):
   _amountPerHouse: int
@@ -150,12 +158,7 @@ class PayPerProperty(Card):
   def execute(self, player: Player) -> None:
     house_count = sum(property.houses() for property in player.owned_streets())
     hotel_count = sum(property.has_hotel() for property in player.owned_streets())
-    player.deduct(self._amountPerHouse * house_count)
-    player.deduct(self._amountPerHotel * hotel_count)
-
-    if player.is_bankrupt(): 
-      player.eliminate(None)
-      raise const.EndTurn 
+    player.deduct(self._amountPerHouse * house_count + self._amountPerHotel * hotel_count)
 
 def build_card(board: Board, data: dict[str, Any]) -> Card:
   match data['action']:

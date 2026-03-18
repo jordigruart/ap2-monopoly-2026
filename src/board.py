@@ -4,8 +4,8 @@ from typing import Iterable, Iterator, TYPE_CHECKING
 import json, random, const, aitools, pickle
 from draw import draw
 
-from deck import Deck
-from tile import Property, Street
+from deck import Deck, DebugDeck
+from tile import Street
 
 if TYPE_CHECKING:
   from tile import Tile
@@ -20,7 +20,7 @@ class Board:
 
   _image_path: str
 
-  _image_counter: int; _index: int; _turn_accumulator: int
+  _image_counter: int; _turn_index: int; _turn_accumulator: int
 
   _dice: tuple[int, int]; _doubles: bool; _straight_doubles: int
   def __init__(self, image_path: str = const.IMAGE_PATH):
@@ -55,7 +55,7 @@ class Board:
     self._image_path = image_path
     self._image_counter = 0
 
-    self._turn_accumulator, self._index = 0, 0
+    self._turn_accumulator, self._turn_index = 0, 0
 
     self._straight_doubles = 0
 
@@ -64,7 +64,7 @@ class Board:
     one whose turn it first ever is. This includes players who are eliminated.'''
     return self._players
   
-  def current_player(self) -> Player: return self.players()[self._index]
+  def current_player(self) -> Player: return self.players()[self._turn_index]
   def tiles(self) -> list[Tile]: 
     '''Returns the tiles in the order in which they appear on the board,
     starting from GO at index 0.'''
@@ -84,7 +84,7 @@ class Board:
 
   def active_players(self) -> list[Player]: 
     '''Returns list of players currently in the game (i.e. not eliminated).'''
-    return list(filter(lambda player: not player.is_bankrupt(), self.players()))
+    return list(filter(lambda player: not player.is_eliminated(), self.players()))
 
   def color_set(self, color: str) -> set[Street]:
     '''Returns the set of streets on the board with the specified color.'''
@@ -119,8 +119,8 @@ class Board:
   def _make_way_for_next_player(self) -> None:
     '''Makes way for next player so that they may play next turn.'''
     self._straight_doubles = 0
-    self._index += 1
-    self._index %= const.MAX_PLAYERS
+    self._turn_index += 1
+    self._turn_index %= len(self.players())
 
   def _prison_routine(self, player: Player):
     '''Handles turn behavior when the player is in jail.
@@ -140,21 +140,16 @@ class Board:
 
   def _free_routine(self, player: Player):
     '''Handles turn behavior after player rolls dice and is free:
-    moves forward, runs tile logic and eliminates player if bankrupt.'''
+    moves forward and runs tile logic.'''
     assert not player.is_in_prison()
     player.move_forward(sum(self.dice()))
     
     current_tile = self.tiles()[player.position()]
     current_tile.land_on(player)
-
-    if player.is_bankrupt():
-      creditor = current_tile.owner() if isinstance(current_tile, Property) else None
-      player.eliminate(creditor)
-      raise const.EndTurn
   
   def _play_turn(self):
     current_player = self.current_player()
-    if current_player.is_bankrupt():
+    if current_player.is_eliminated():
       self._make_way_for_next_player()
       return
     
@@ -188,17 +183,21 @@ class Board:
 
 class DebugBoard(Board):
   '''Altered version of the normal board used for testing.
-  Takes an iterable of die rolls for an input, instead of using a seed to generate inputs.
-  Stops execution when there are no more dice to roll.'''
+  Takes a list of die rolls for an input, instead of using a seed to generate inputs.
+  Also takes a list of card IDs that will be drawn sequencially when players
+  land on card tiles. Both decks exhaust the same iterator.
+  Stops execution when there are no more dicee to roll or when cards run out.'''
   _die_inputs: Iterator[tuple[int, int]]
   def __init__(
     self,
     die_inputs: Iterable[tuple[int, int]],
-    cards: Iterable[Card] = []
+    cards: Iterable[int] = []
   ):
     super().__init__(image_path = const.DEBUG_IMAGE_PATH)
     self._die_inputs = iter(die_inputs)
-    self._cards = iter(cards)
+    card_ids = iter(cards)
+    self._chance_deck = DebugDeck(card_ids, board = self, path = const.CHANCE_JSON_PATH)
+    self._community_deck = DebugDeck(card_ids, board = self, path = const.COMMUNITY_CHEST_JSON_PATH)
       
   def throw_dice(self) -> None:
     '''Updates dice to next tuple in die inputs and draws board.

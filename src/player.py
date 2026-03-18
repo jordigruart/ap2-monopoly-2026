@@ -5,7 +5,7 @@ import aitools
 
 if TYPE_CHECKING:
   from board import Board
-  from tile import Street, Station, Utility, Property
+  from tile import Tile, Street, Station, Utility, Property
 
 class Player:
   _board: Board
@@ -20,6 +20,7 @@ class Player:
   _in_prison: bool
   _turns_in_prison: int
   _get_out_of_jail_free_cards: int
+  _is_eliminated: bool
 
   _streets: set[Street]
   _stations: set[Station]
@@ -45,6 +46,7 @@ class Player:
     self._in_prison = False
     self._turns_in_prison = 0
     self._get_out_of_jail_free_cards = 0
+    self._is_eliminated = False
 
     self._streets = set()
     self._stations = set()
@@ -58,8 +60,22 @@ class Player:
   def color(self) -> str: return self._color
   def index(self) -> int: return self._index
 
+  def current_tile(self) -> Tile:
+    '''Returns the tile the player is currently on; not the position.'''
+    return self.board().tiles()[self.position()]
+
+
   def balance(self) -> int: return self._money
-  def is_bankrupt(self) -> bool: return self._money < 0
+  def is_bankrupt(self) -> bool:
+    '''Returns whether the player's balance is below zero.
+    Different from Player.is_eliminated.'''
+    return self._money < 0
+  
+  def is_eliminated(self) -> bool:
+    '''Returns whether the elimination logic has been run on the player.
+    Different from Player.is_bankrupt.'''
+    return self._is_eliminated
+
   def position(self) -> int: return self._position
 
   def is_in_prison(self) -> bool: return self._in_prison
@@ -85,11 +101,14 @@ class Player:
     raise const.EndTurn
 
   def free(self) -> None:
-    '''Frees a player from jail, allowing them to play normally.'''
+    '''Frees a player from jail, allowing them to play normally.
+    
+    Board-drawing: This function draws the board.'''
     print(f'{self} has been freed from jail')
-
     self._in_prison = False
     self._turns_in_prison = 0
+    
+    self.board().draw()
 
   def update_turns_in_prison(self):
     '''Updates count of turns spent in prison.
@@ -98,9 +117,7 @@ class Player:
     Board-drawing: This function draws the board whenever the player is freed.'''
     if self.is_in_prison():
       self._turns_in_prison += 1
-      if self.turns_in_prison() == 3:
-        self.board().draw()
-        self.free()
+      if self.turns_in_prison() == 3: self.free()
   
 
   def station_count(self) -> int:
@@ -133,11 +150,15 @@ class Player:
     '''Increments the player's balance by the specified amount.'''
     self._money += increment
 
-  def deduct(self, decrement: int) -> int:
-    '''Decrements the player's balance by the specified amount and returns the
-    amount deducted.'''
+  def deduct(self, decrement: int, creditor: Player | None = None) -> None:
+    '''Decrements the player's balance by the specified amount.
+    creditor is the player that the amount has been paid to.
+    
+    Runs elimination logic if player has gone bankrupt..'''
     self._money -= decrement
-    return decrement
+    if self.is_bankrupt():
+      self.eliminate(creditor)
+      if self.board().current_player() == self: raise const.EndTurn
   
 
   def move_forward(self, increment: int, go_bonus: bool = True) -> None:
@@ -197,6 +218,9 @@ class Player:
     self.board().draw()
 
   def buy(self, property: Property):
+    '''Buys a property.
+    
+    Board-drawing: this function draws the board.'''
     assert self.balance() >= property.price(), 'Insufficient funds'
     self.deduct(property.price())
     self.entrust_property(property)
@@ -214,23 +238,24 @@ class Player:
     self.entrust_property(property)
     
     aitools.decide_keep_or_demortgage(self, property)
-    # Keeping the property might have left the player bankrupt
-    if self.is_bankrupt(): self.eliminate(None)
 
   def eliminate(self, creditor: Player | None) -> None:
     '''Eliminates self from play. Gives all GOOJF cards and all mortgaged
-    properties to creditor and takes away the rest of their properties. If creditor is
-    None, theyre.
+    properties to creditor and takes away the rest of their properties. If
+    creditor is None, behavior is as if they werent eliminated by a player,
+    and all properties are taken away.
     
-    Board-drawing: This function draws the board after eliminating the player.'''
-    for property in self.owned_properties():
-      if property.is_mortgaged():
-        if creditor is None: property.reset()
-        else: creditor.recieve_property_from_elimination(property)
-      else: property.reset()
+    Board-drawing: This function draws the board for every mortgaged property
+    given to the creditor, and once more after eliminating the player.'''
+    for attr in self._utilities, self._streets, self._stations:
+      while attr:
+        property = attr.pop()
+        if creditor and property.is_mortgaged() and not creditor.is_eliminated():
+          creditor.recieve_property_from_elimination(property)
+        else: property.reset()
     
-    for attr in self._utilities, self._streets, self._stations: attr.clear()
     print(f'{self} has been eliminated by {creditor}')
+    self._is_eliminated = True
     self.board().draw()
 
 def build_player(board: Board, data: dict[str, Any], index: int) -> Player:

@@ -1,3 +1,6 @@
+'''Functions that have to do with player strategy. See README for a detailed
+description of player behavior.'''
+
 from __future__ import annotations
 from typing import Iterator, TYPE_CHECKING
 
@@ -27,7 +30,7 @@ def building_order(color: set[Street]) -> Iterator[Street]:
     else: return
 
 def post_turn_actions(player: Player) -> None:
-  '''Tries to go above lower spending threshold.
+  '''Runs actions that take place after landing 
   
   Board-drawing: this function draws the board for every change to the board.'''
   if player.balance() < const.SPENDING_THRESHOLD:
@@ -76,12 +79,15 @@ def decide_keep_or_demortgage(player: Player, property: Property):
   '''When a mortgaged property is recieved after elimination, the player must
   either remove the mortgage or keep it by paying a 10% of the mortgage. The
   AI demortgages the property if the player is above the spending threshold
-  and has the money, and keeps it otherwise.'''
+  and has the money, and keeps it otherwise.
+  
+  Board-drawing: This function draws the board.'''
   if player.balance() >= max(property.demortgage_fee(), const.SPENDING_THRESHOLD): # demortgage
     property.demortgage()
   
   else: # keep
     player.deduct(int(.1 * property.mortgage_bonus()))
+    property.board().draw()
     print(f'{player} has decided to keep {property}\'s mortgage.')
 
 def prompt_buy(player: Player, property: Property):

@@ -1,11 +1,13 @@
 from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
+import const
 import drawsvg as dw
 
 if TYPE_CHECKING:
   from tile import Tile, Property
   from board import Board
+  from player import Player
 
 # Board dimensions: 1000x1000 total; player info in four quadrants at center
 BOARD_SIZE = 1000
@@ -230,7 +232,7 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
             )
         # Owned properties: show owner number or piece in white at bottom right
         if tile.tile_type() in ("property", "station", "utility"):
-            owner = tile.owner()
+            owner: Player = tile.owner()
             if owner is not None:
                 if show_number:
                     label = str(owner.index() + 1)
@@ -303,7 +305,7 @@ def draw_player_circles(d: dw.Drawing, board: Board, show_number: bool = False) 
     radius = 16
     # Distribute circles so they don't overlap on same tile
     for i, player in enumerate(players):
-        if player.is_bankrupt(): continue
+        if player.is_eliminated(): continue
         cx, cy = tile_center(player.position())
         same_tile = [
             j for j, p in enumerate(players) if p.position() == player.position()
@@ -512,13 +514,13 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
                             stroke_width=0.5,
                         )
                     )
-                elif p.tile_type == "station":
+                elif p.tile_type() == "station":
                     d.append(
                         dw.Text(
                             "🚆 ", prop_font_size, qx + pad, ty, font_family=FONT_FAMILY
                         )
                     )
-                elif p.tile_type == "utility":
+                elif p.tile_type() == "utility":
                     symbol = "💡 " if "Electric" in p.name() else "🚰 "
                     d.append(
                         dw.Text(
@@ -556,7 +558,7 @@ def draw_players_center(d: dw.Drawing, board: Board, show_number: bool = False) 
                 )
 
 
-def draw(board: Board, svg_path: str, show_number: bool = False) -> None:
+def draw(board: Board, svg_path: str = const.IMAGE_PATH, show_number: bool = False) -> None:
     """Draw the Monopoly game to board.svg: board with padding, players in four center quadrants."""
     total_size = BOARD_SIZE + 2 * IMAGE_PADDING
     d = dw.Drawing(total_size, total_size, id_prefix="board")

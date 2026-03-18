@@ -7,12 +7,12 @@ if TYPE_CHECKING: from tile import Street
 def test_building_orderly() -> DebugBoard:
   '''Test whether building in order works.'''
   board = DebugBoard(
-    die_inputs = [(-1, 1)]
+    die_inputs = [(-1, 1), (-1, 1), (-1, 1), (-1, 1), (0, 4)]
   )
   jordi = board.players()[0]
   regent, oxford, tmp, bond = board.tiles()[31:35]
 
-  board.play()
+  board.run(1)
   # end play before we give jordi anything lest the ai build inadvertedly
 
   jordi.entrust(19000)

@@ -60,7 +60,7 @@ def test_street_rent_mortgage() -> DebugBoard:
 
   return board
 
-def test_rent_street_demortgage():
+def test_street_rent_demortgage():
   '''Tests that rent is charged on a previously mortgaged property after being demortgaged.'''
   board = test_street_rent_mortgage()
   arnau = board.players()[2]
@@ -77,6 +77,7 @@ def test_rent_street_color_set() -> DebugBoard:
     die_inputs = [(-1, 1), (2, 1), (2, 1)]
   )
   jordi, mireia = board.players()[:2]
+  old_kent: Street; whitechapel: Street
   old_kent, tmp, whitechapel = board.tiles()[1:4]
 
   board.run(1)
@@ -98,11 +99,12 @@ def test_rent_street_color_set() -> DebugBoard:
 
   return board
 
-def test_rent_street_color_set_with_mortgage():
+def test_street_rent_color_set_with_mortgage():
   '''Tests that color set rent is also applied even when a property in the set
   is mortgaged.'''
   board = test_rent_street_color_set() # jordi owns the brown color set and it is arnau's turn
   arnau = board.players()[2]
+  old_kent: Street; whitechapel: Street
   old_kent, tmp, whitechapel = board.tiles()[1:4]
 
   old_kent.mortgage()
@@ -113,15 +115,15 @@ def test_rent_street_color_set_with_mortgage():
     const.START_MONEY - getattr(whitechapel, '_color_set_rents')[0]
   )
 
-def test_rent_street_houses():
+def test_street_rent_houses():
   '''Tests that rent is charged properly on a street when there are houses
   built on it, for one to four houses.'''
   for i in range(1, 5):
     board = DebugBoard(
       die_inputs = [(-1, 1), (2, 1)]
     )
-    jordi = board.players()[0]
-    mireia = board.players()[1]
+    jordi, mireia = board.players()[:2]
+    old_kent: Street; whitechapel: Street
     old_kent, tmp, whitechapel = board.tiles()[1:4]
 
     board.run(1) # if we gave jordi any properties before he ended his turn, the ai
@@ -145,8 +147,8 @@ def test_street_rent_hotel():
   board = DebugBoard(
     die_inputs = [(-1, 1), (2, 1)]
   )
-  jordi = board.players()[0]
-  mireia = board.players()[1]
+  jordi, mireia = board.players()[:2]
+  old_kent: Street; whitechapel: Street
   old_kent, tmp, whitechapel = board.tiles()[1:4]
 
   board.run(1)
@@ -162,6 +164,18 @@ def test_street_rent_hotel():
   assert mireia.balance() == (
     const.START_MONEY - getattr(whitechapel, '_rent_with_hotel')
   )
+
+def test_station_default_rent():
+  raise NotImplementedError
+
+def test_station_rent_2_stations():
+  raise NotImplementedError
+
+def test_station_rent_3_stations():
+  raise NotImplementedError
+
+def test_station_rent_4_stations():
+  raise NotImplementedError
 
 def test_utility_default_rent():
   '''Tests that rent is charged properly when a player lands on an utility
@@ -233,3 +247,9 @@ def test_utility_doubles_no_straight_double_count():
   # mireia rolls doubles again
   # mireia should not be in prison because she only got two straight doubles
   assert not mireia.is_in_prison()
+
+def test_utility_doesnt_break_doubles_streak():
+  '''Tests that, if a player has rolled doubles to land on this tile,
+  they get to play again regardless of what they rolled'''
+
+  raise NotImplementedError
