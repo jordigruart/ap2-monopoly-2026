@@ -211,7 +211,7 @@ CARD_TYPES: dict[str, type[Card]] = {
   'collect_from_players': CollectFromPlayers
 }
 
-def build_card(board: Board, **data: Any) -> Card:
+def build_card(board: Board, action: str, **data: Any) -> Card:
   '''Builds a card from JSON-like dictionary for kwargs (data).'''
-  card_type = CARD_TYPES.get(data['action'], Card)
+  card_type = CARD_TYPES.get(action, Card)
   return card_type(**data, board = board)
