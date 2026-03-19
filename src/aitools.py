@@ -10,7 +10,7 @@ if TYPE_CHECKING:
   from player import Player
   from tile import Street
 
-def selling_order(color: set[Street]) -> Iterator[Street]:
+def _selling_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which buildings must be sold in a color
   set (according to the "sell evenly" rule).'''
   # asymptotically, this (O(n^2) is slower than using a priority queue (O(n log n))
@@ -21,7 +21,7 @@ def selling_order(color: set[Street]) -> Iterator[Street]:
     if candidate.houses() > 0: yield candidate
     else: return
 
-def building_order(color: set[Street]) -> Iterator[Street]:
+def _building_order(color: set[Street]) -> Iterator[Street]:
   '''Returns a possible legal order in which to build buildings on a color set
   (according to the "build evenly" rule).'''
   while True:
@@ -46,7 +46,7 @@ def _run_selling_actions(player: Player) -> None:
   # sell buildings
   for color in filter(player.owns_color, const.COLORS):
     color = player.board().color_set(color)
-    for property in selling_order(color):
+    for property in _selling_order(color):
       property.sell()
       if player.balance() >= const.SPENDING_THRESHOLD: return
   
@@ -70,7 +70,7 @@ def _run_buying_actions(player: Player) -> None:
   # if we can still spend, ai shall try to build
   for color in filter(player.owns_color, const.COLORS):
     color_set = player.board().color_set(color)
-    for property in building_order(color_set):
+    for property in _building_order(color_set):
       if player.balance() < const.SPENDING_THRESHOLD: return
       if player.balance() >= property.building_cost(): property.build()
       else: return
