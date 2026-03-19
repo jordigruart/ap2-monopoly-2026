@@ -5,24 +5,22 @@ import json, random, const, aitools, pickle
 from draw import draw
 
 from deck import Deck, DebugDeck
-from tile import Street
+from player import build_player
+from tile import Street, build_tile
 
 if TYPE_CHECKING:
   from tile import Tile
   from player import Player
-  from card import Card
 
 class Board:
   '''Class that simulates a game board. Initialization argument image_path is
   the directory (with respect to the root) where generated images are stored.'''
   _tiles: list[Tile]; _players: list[Player]; _chance_deck: Deck; _community_deck: Deck
   _color_sets: dict[str, set[Street]]
-
-  _image_path: str
-
-  _image_counter: int; _turn_index: int; _turn_accumulator: int
-
   _dice: tuple[int, int]; _doubles: bool; _straight_doubles: int
+  _turn_index: int; _turn_accumulator: int
+  _image_path: str;  _image_counter: int
+  
   def __init__(self, image_path: str = const.IMAGE_PATH):
     # We assume the items appear in the files in positional order, just
     # as they do in the files given to us.
@@ -35,28 +33,23 @@ class Board:
     self._tiles = []
     self._color_sets = {}
     with open(const.TILES_JSON_PATH, encoding = 'UTF-8') as file:
-      from tile import build_tile
       for raw_tile in json.load(file):
-        tile = build_tile(self, raw_tile)
+        tile = build_tile(self, **raw_tile)
         self._tiles.append(tile)
-        
-        if tile.tile_type() == 'property': # add street to corresponding color set
-          assert isinstance(tile, Street)
-          color = tile.color
-          if color not in self._color_sets: self._color_sets[color] = set()
-          self._color_sets[tile.color].add(tile)
+
+    # load tiles into color sets
+    self._color_sets = {color: set[Street]() for color in const.COLORS}
+    for tile in self._tiles:
+      if isinstance(tile, Street): self._color_sets[tile.color].add(tile)
 
     # load players
     with open(const.PLAYERS_JSON_PATH, encoding = 'UTF-8') as file:
-      from player import build_player
       players = json.load(file)
-      self._players = [build_player(self, player, i) for i, player in enumerate(players)]
+      self._players = [build_player(self, i, **player) for i, player in enumerate(players)]
 
     self._image_path = image_path
     self._image_counter = 0
-
     self._turn_accumulator, self._turn_index = 0, 0
-
     self._straight_doubles = 0
 
   def players(self) -> list[Player]:
@@ -64,7 +57,10 @@ class Board:
     one whose turn it first ever is. This includes players who are eliminated.'''
     return self._players
   
-  def current_player(self) -> Player: return self.players()[self._turn_index]
+  def current_player(self) -> Player:
+    '''Returns the player whose turn it currently is.'''
+    return self.players()[self._turn_index]
+  
   def tiles(self) -> list[Tile]: 
     '''Returns the tiles in the order in which they appear on the board,
     starting from GO at index 0.'''
@@ -85,15 +81,17 @@ class Board:
   def active_players(self) -> list[Player]: 
     '''Returns list of players currently in the game (i.e. not eliminated).'''
     return list(filter(lambda player: not player.is_eliminated(), self.players()))
-
+  
   def color_set(self, color: str) -> set[Street]:
     '''Returns the set of streets on the board with the specified color.'''
     return self._color_sets[color]
   
-  def jail_position(self) -> int: return 10
+  def jail_position(self) -> int:
+    '''Returns the position where the jail tile is.'''
+    return 10
 
   def throw_dice(self) -> None:
-    '''Updates dice with two new random valuesd.
+    '''Updates dice with two new random values.
     
     Board-drawing: this function draws the board.'''
     self._dice = random.randint(1, 6), random.randint(1, 6)
@@ -144,7 +142,7 @@ class Board:
     assert not player.is_in_prison()
     player.move_forward(sum(self.dice()))
     
-    current_tile = self.tiles()[player.position()]
+    current_tile = player.current_tile()
     current_tile.land_on(player)
   
   def _play_turn(self):
@@ -156,7 +154,7 @@ class Board:
     else:
       self._turn_accumulator += 1
       print(f'TURN {self._turn_accumulator}: {current_player}\'s turn')
-
+    
     if current_player.is_in_prison(): self._prison_routine(current_player)
     else: self.throw_dice()
 

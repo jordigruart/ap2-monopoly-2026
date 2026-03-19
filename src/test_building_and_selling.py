@@ -10,7 +10,8 @@ def test_building_orderly() -> DebugBoard:
     die_inputs = [(-1, 1), (-1, 1), (-1, 1), (-1, 1), (0, 4)]
   )
   jordi = board.players()[0]
-  regent, oxford, tmp, bond = board.tiles()[31:35]
+  regent: Street; oxford: Street; bond: Street
+  regent, oxford, tmp, bond = board.tiles()[31:35] # type: ignore
 
   board.run(1)
   # end play before we give jordi anything lest the ai build inadvertedly
@@ -26,7 +27,8 @@ def test_building_orderly() -> DebugBoard:
 def test_selling_orderly():
   '''Tests that selling in order works.'''
   board = test_building_orderly()
-  regent, oxford, tmp, bond = board.tiles()[31:35]
+  regent: Street; oxford: Street; bond: Street
+  regent, oxford, tmp, bond = board.tiles()[31:35] # type: ignore
 
   oxford.sell(); bond.sell(); regent.sell(); bond.sell()
   oxford.sell(); oxford.sell(); bond.sell(); regent.sell()
@@ -38,7 +40,7 @@ def test_building_unorderly():
       die_inputs = [(-1, 1)]
     )
     jordi = board.players()[0]
-    regent: Street = board.tiles()[31]
+    regent: Street = board.tiles()[31] # type: ignore
 
     board.play()
 
@@ -46,3 +48,11 @@ def test_building_unorderly():
     for property in board.color_set('green'): jordi.buy(property)
 
     for _ in range(2): regent.build()
+
+def test_selling_unorderly():
+  '''Tests that selling on the same tile twice in a row does not work.'''
+  with pytest.raises(Exception):
+    board = test_building_orderly() #jordi has some greens with houses built on them
+    bond: Street = board.tiles()[32] # type: ignore
+
+    bond.sell(); bond.sell()

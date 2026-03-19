@@ -61,9 +61,24 @@ def test_ai_sells_properly_from_full_set() -> DebugBoard:
 
   return board
 
-def test_elimination_pays_mortgage_if_able() -> None:
-  '''Tests that a player.'''
+def test_get_out_of_jail_free():
+  '''Tests that a player uses a GOOJF card if they own one.'''
+  board = DebugBoard(
+    die_inputs = [
+      (1, 1), (14, 14), (1, -1), (1, -1), (1, -1),
+      (2, 3)
+    ],
+    cards = [5]
+  )
+  jordi = board.players()[0]
+  board.play() # jordi lands on community chest and draws GOOJF
+  # then lands on go to jail
+  # everybody stalls for a turn
+  # then its jordis turn. he shouldve used the GOOJF, got out and rolled
+  assert not jordi.is_in_prison()
 
+def test_pays_mortgage_if_able() -> None:
+  '''Tests that a player.'''
   raise NotImplementedError
 
 # def makes right choices when recieving properties

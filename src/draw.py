@@ -7,7 +7,6 @@ import drawsvg as dw
 if TYPE_CHECKING:
   from tile import Tile, Property
   from board import Board
-  from player import Player
 
 # Board dimensions: 1000x1000 total; player info in four quadrants at center
 BOARD_SIZE = 1000
@@ -89,7 +88,7 @@ def tile_fill_color(tile: Tile) -> str:
 
 def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> None:
     """Draw all tiles on the left board area."""
-    for tile in board.tiles():
+    for tile in board.tiles(): #type: ignore
         x, y, w, h = tile_rect(tile.position())
         fill = tile_fill_color(tile)
         d.append(dw.Rectangle(x, y, w, h, fill=fill, stroke="black", stroke_width=1))
@@ -232,7 +231,8 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
             )
         # Owned properties: show owner number or piece in white at bottom right
         if tile.tile_type() in ("property", "station", "utility"):
-            owner: Player = tile.owner()
+            tile: Property
+            owner = tile.owner
             if owner is not None:
                 if show_number:
                     label = str(owner.index() + 1)

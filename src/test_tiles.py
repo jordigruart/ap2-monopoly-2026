@@ -1,10 +1,20 @@
 import pytest
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING: from tile import Street, Utility
+if TYPE_CHECKING: from tile import Street, Utility, Station
 
 import const
 from board import DebugBoard
+
+def test_go_to_jail():
+  '''Tests that the Go to Jail tile sends a player to jail.'''
+  board = DebugBoard(
+    die_inputs = [(30, 0)]
+  )
+  jordi = board.players()[0]
+  board.play()
+
+  assert jordi.is_in_prison()
 
 def test_tax():
   '''Tests that landing on a tax tile charges the player the corresponding amount.'''
@@ -22,7 +32,7 @@ def test_street_buy() -> DebugBoard:
     die_inputs = [(3, 0), (3, 0), (3, 0)]
   )
   jordi = board.players()[0]
-  whitechapel_road: Street = board.tiles()[3]
+  whitechapel_road: Street = board.tiles()[3] # type: ignore
 
   board.run(1)
   assert whitechapel_road in jordi.owned_properties()
@@ -32,10 +42,10 @@ def test_street_buy() -> DebugBoard:
 
 def test_street_rent_default():
   '''Tests that default rent (no color set or buildings) is charged properly
-  on a street.'''
+  on a street, and that the owner receives it.'''
   board = test_street_buy()
   jordi, mireia = board.players()[:2]
-  whitechapel_road: Street = board.tiles()[3]
+  whitechapel_road: Street = board.tiles()[3] # type: ignore
 
   board.run(1)
   # mireia has landed on whitechapel, but she should not own it, as jordi already does
@@ -52,7 +62,7 @@ def test_street_rent_mortgage() -> DebugBoard:
   '''Tests that rent is not charged on a mortgaged property.'''
   board = test_street_buy()
   mireia = board.players()[1]
-  whitechapel: Street = board.tiles()[3]
+  whitechapel: Street = board.tiles()[3] # type: ignore
 
   whitechapel.mortgage()
   board.run(1) # mireia lands on whitehchapel; should not have been charged any rent because it is mortgaged
@@ -64,7 +74,7 @@ def test_street_rent_demortgage():
   '''Tests that rent is charged on a previously mortgaged property after being demortgaged.'''
   board = test_street_rent_mortgage()
   arnau = board.players()[2]
-  whitechapel: Street = board.tiles()[3]
+  whitechapel: Street = board.tiles()[3] # type: ignore
 
   whitechapel.demortgage()
   board.run(1) # arnau lands on whitehchapel; should be charged rent as it has been demortgaged
@@ -78,7 +88,7 @@ def test_rent_street_color_set() -> DebugBoard:
   )
   jordi, mireia = board.players()[:2]
   old_kent: Street; whitechapel: Street
-  old_kent, tmp, whitechapel = board.tiles()[1:4]
+  old_kent, tmp, whitechapel = board.tiles()[1:4] # type: ignore
 
   board.run(1)
   for property in old_kent, whitechapel: jordi.buy(property)
@@ -105,7 +115,7 @@ def test_street_rent_color_set_with_mortgage():
   board = test_rent_street_color_set() # jordi owns the brown color set and it is arnau's turn
   arnau = board.players()[2]
   old_kent: Street; whitechapel: Street
-  old_kent, tmp, whitechapel = board.tiles()[1:4]
+  old_kent, tmp, whitechapel = board.tiles()[1:4] # type: ignore
 
   old_kent.mortgage()
   board.run(1) # arnau lands on whitechapel
@@ -124,7 +134,7 @@ def test_street_rent_houses():
     )
     jordi, mireia = board.players()[:2]
     old_kent: Street; whitechapel: Street
-    old_kent, tmp, whitechapel = board.tiles()[1:4]
+    old_kent, tmp, whitechapel = board.tiles()[1:4] # type: ignore
 
     board.run(1) # if we gave jordi any properties before he ended his turn, the ai
     # would build stuff on its own, which we dont want
@@ -149,7 +159,7 @@ def test_street_rent_hotel():
   )
   jordi, mireia = board.players()[:2]
   old_kent: Street; whitechapel: Street
-  old_kent, tmp, whitechapel = board.tiles()[1:4]
+  old_kent, tmp, whitechapel = board.tiles()[1:4] # type: ignore
 
   board.run(1)
   # end jordi's turn before we give him anything lest the ai build inadvertedly
@@ -166,16 +176,75 @@ def test_street_rent_hotel():
   )
 
 def test_station_default_rent():
-  raise NotImplementedError
+  '''Tests that rent is charged properly when landing on a station when the
+  owner only owns one station.'''
+  board = DebugBoard(
+    die_inputs = [(5, 0), (5, 0)]
+  )
+  mireia = board.players()[1]
+  station: Station = board.tiles()[5] # type: ignore
+  board.play() # jordi lands on the station and buys it; mireia then lands on
+  # the station and pays the rent
+  assert mireia.balance() == (
+    const.START_MONEY - getattr(station, '_rents')[1])
 
 def test_station_rent_2_stations():
-  raise NotImplementedError
+  '''Tests that rent is charged properly when landing on a station when the
+  owner owns two stations.'''
+  board = DebugBoard(
+    die_inputs = [
+      (5, 0), (-1, 1), (-1, 1), (-1, 1),
+      (10, 0), (5, 0)
+    ])
+  
+  mireia = board.players()[1]
+  kings_cross: Station = board.tiles()[5] # type: ignore
+  board.play() # jordi lands on kings cross and buys it; the rest of the players stall for a turn
+  # jordi then lands on another station and buys it. then, mireia lands on kings cross
+  # and pays the rent for 2 stations
+  assert mireia.balance() == (
+    const.START_MONEY - getattr(kings_cross, '_rents')[2]
+  )
 
 def test_station_rent_3_stations():
-  raise NotImplementedError
+  '''Tests that rent is charged properly when landing on a station when the
+  owner owns three stations.'''
+  board = DebugBoard(
+    die_inputs = [
+      (5, 0), (-1, 1), (-1, 1), (-1, 1),
+      (5, 5), (10, 0), (5, 0)
+    ])
+  
+  mireia = board.players()[1]
+  kings_cross: Station = board.tiles()[5] # type: ignore
+  board.play() # jordi lands on kings cross and buys it; the rest of the players stall for a turn
+  # jordi rolls doubles, lands on another station and buys it, then rolls again
+  # to land on another station and buys it
+  # for a total of 3 stations
+  # then mireia lands on kings cross and pays the rent for 3 stations
+  assert mireia.balance() == (
+    const.START_MONEY - getattr(kings_cross, '_rents')[3]
+  )
 
 def test_station_rent_4_stations():
-  raise NotImplementedError
+  '''Tests that rent is charged properly when landing on a station when the
+  owner owns all (4) stations.'''
+  board = DebugBoard(
+    die_inputs = [
+      (5, 0), (-1, 1), (-1, 1), (-1, 1),
+      (5, 5), (5, 5), (10, 0), (5, 0)
+    ])
+  
+  mireia = board.players()[1]
+  kings_cross: Station = board.tiles()[5] # type: ignore
+  board.play() # jordi lands on kings cross and buys it; the rest of the players stall for a turn
+  # jordi rolls doubles, lands on another station and buys it, then rolls doubles again,
+  # lands on another station and buys it, then finally plays again and lands on the last station and buys it
+  # for a total of four stations
+  # then mireia lands on kings cross and pays the rent for 4 stations
+  assert mireia.balance() == (
+    const.START_MONEY - getattr(kings_cross, '_rents')[4]
+  )
 
 def test_utility_default_rent():
   '''Tests that rent is charged properly when a player lands on an utility
@@ -184,7 +253,7 @@ def test_utility_default_rent():
     die_inputs = [(12, 0), (12, 0), (1, 3)]
   )
   mireia = board.players()[1]
-  electric_company: Utility = board.tiles()[12]
+  electric_company: Utility = board.tiles()[12] # type: ignore
 
   board.play()
   # jordi lands on electric company and buys it
@@ -237,7 +306,6 @@ def test_utility_doubles_no_straight_double_count():
   board = DebugBoard(
     die_inputs = [(12, 0), (6, 6), (2, 2), (3, 3)]
   )
-
   mireia = board.players()[1]
 
   board.play()
@@ -250,6 +318,13 @@ def test_utility_doubles_no_straight_double_count():
 
 def test_utility_doesnt_break_doubles_streak():
   '''Tests that, if a player has rolled doubles to land on this tile,
-  they get to play again regardless of what they rolled'''
+  they get to play again regardless of what they rolled for rent'''
+  board = DebugBoard(
+    die_inputs = [(12, 0), (6, 6), (1, 2), (3, 2)]
+  )
+  mireia = board.players()[1]
 
-  raise NotImplementedError
+  board.play() # jordi buys electric, mireia rolls doubles and lands on electric,
+  # rolls 1, 2 for rent and then rols
+  assert mireia.position() == 12 + 5
+  # in order to have played again, she has to have used up both 6, 6 and 3, 2

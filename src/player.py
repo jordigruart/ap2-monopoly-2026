@@ -58,14 +58,16 @@ class Player:
   def name(self) -> str: return self._name
   def piece(self) -> str: return self._piece
   def color(self) -> str: return self._color
-  def index(self) -> int: return self._index
+  def index(self) -> int:
+    '''Returns the player index. The first player to ever play starts at 0.'''
+    return self._index
 
   def current_tile(self) -> Tile:
-    '''Returns the tile the player is currently on; not the position.'''
+    '''Returns the tile the player is currently on. Different from
+    Player.position, which returns an integer representing the
+    position of this tile in the board, as opposed to an object.'''
     return self.board().tiles()[self.position()]
 
-
-  def balance(self) -> int: return self._money
   def is_bankrupt(self) -> bool:
     '''Returns whether the player's balance is below zero.
     Different from Player.is_eliminated.'''
@@ -76,8 +78,13 @@ class Player:
     Different from Player.is_bankrupt.'''
     return self._is_eliminated
 
-  def position(self) -> int: return self._position
+  def position(self) -> int:
+    '''Returns the position of the player. Different from Player.tile, which
+    returns the actual Tile object.'''
+    return self._position
+  
 
+  # prison methods
   def is_in_prison(self) -> bool: return self._in_prison
   def turns_in_prison(self) -> int: return self._turns_in_prison
 
@@ -118,8 +125,9 @@ class Player:
     if self.is_in_prison():
       self._turns_in_prison += 1
       if self.turns_in_prison() == 3: self.free()
-  
 
+
+  # property methods
   def station_count(self) -> int:
     '''Returns how many stations are currently in the player's posession.'''
     return len(self._stations)
@@ -138,14 +146,41 @@ class Player:
 
   def owns(self, property: Property) -> bool:
     '''Returns whether the player owns the specified property.'''
-    return property.owner() == self
+    return property.owner == self
   
   def owns_color(self, color: str) -> bool:
     '''Returns whether the player owns every property in the specified color
     set.'''
     return all(self.owns(property) for property in self.board().color_set(color))
+  
+  def entrust_property(self, property: Property):
+    '''Gives the specified property to this player. Changes all the internal
+    variables that handle ownership, both in the player and in the tile.
+    
+    Board-drawing: this function draws the board.'''
+    property.owner = self
+
+    match property.tile_type():
+      case 'property': self._streets.add(property)    # type: ignore
+      case 'station': self._stations.add(property)    # type: ignore
+      case 'utility': self._utilities.add(property)   # type: ignore
+      case _: raise
+    
+    self.board().draw()
+
+  def buy(self, property: Property):
+    '''Buys a property.
+    
+    Board-drawing: this function draws the board.'''
+    assert self.balance() >= property.price(), 'Insufficient funds'
+    self.deduct(property.price())
+    self.entrust_property(property)
+
+    print(f'{self.name()} has bought {property.name()}')
 
 
+  # balance methods
+  def balance(self) -> int: return self._money
   def entrust(self, increment: int) -> None:
     '''Increments the player's balance by the specified amount.'''
     self._money += increment
@@ -154,13 +189,14 @@ class Player:
     '''Decrements the player's balance by the specified amount.
     creditor is the player that the amount has been paid to.
     
-    Runs elimination logic if player has gone bankrupt..'''
+    Runs elimination logic if player has gone bankrupt.'''
     self._money -= decrement
     if self.is_bankrupt():
       self.eliminate(creditor)
       if self.board().current_player() == self: raise const.EndTurn
-  
 
+
+  # movement methods
   def move_forward(self, increment: int, go_bonus: bool = True) -> None:
     '''Moves player forward by the increment.
     
@@ -200,33 +236,9 @@ class Player:
     self._position = position
   
     self.board().draw()
-  
 
-  def entrust_property(self, property: Property):
-    '''Gives the specified property to this player. Changes all the internal
-    variables that handle ownership, both in the player and in the tile.
-    
-    Board-drawing: this function draws the board.'''
-    property.__setattr__('_owner', self)
 
-    match property.tile_type():
-      case 'property': self._streets.add(property)    # type: ignore
-      case 'station': self._stations.add(property)    # type: ignore
-      case 'utility': self._utilities.add(property)   # type: ignore
-      case _: raise
-    
-    self.board().draw()
-
-  def buy(self, property: Property):
-    '''Buys a property.
-    
-    Board-drawing: this function draws the board.'''
-    assert self.balance() >= property.price(), 'Insufficient funds'
-    self.deduct(property.price())
-    self.entrust_property(property)
-
-    print(f'{self.name()} has bought {property.name()}')
-
+  # elimination methods
   def recieve_property_from_elimination(self, property: Property):
     '''When a player is eliminated from play, they give all their mortgaged
     properties to the owner of the space that made them bankrupt. The reciever
@@ -258,6 +270,6 @@ class Player:
     self._is_eliminated = True
     self.board().draw()
 
-def build_player(board: Board, data: dict[str, Any], index: int) -> Player:
+def build_player(board: Board, index: int, **data: Any) -> Player:
   """Build a Player from JSON-like dict with 'name', 'piece', and 'color' keys."""
   return Player(board, data["name"], data["piece"], data["color"], index)

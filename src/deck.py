@@ -10,9 +10,10 @@ class Deck:
   _cards: dict[int, Card]
 
   def __init__(self, board: Board, path: str) -> None:
+    '''Builds a deck of cards from a JSON-like dictionary.'''
     with open(path) as file:
       data = json.load(file)
-    self._cards = {card['id']: build_card(board, card) for card in data}
+    self._cards = {card['id']: build_card(board, **card) for card in data}
   
   def extract(self):
     '''Returns a random card from the deck'''

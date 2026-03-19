@@ -31,15 +31,13 @@
     "id": 5,
     "title": "Get Out of Jail Free",
     "description": "Get Out of Jail Free",
-    "action": "get_out_of_jail_card",
-    "keepCard": true
+    "action": "get_out_of_jail_card"
   },
   {
     "id": 6,
     "title": "Go to Jail",
     "description": "Go to Jail. Go directly to jail, do not pass Go, do not collect £200",
-    "action": "go_to_jail",
-    "position": 10
+    "action": "go_to_jail"
   },
   {
     "id": 7,

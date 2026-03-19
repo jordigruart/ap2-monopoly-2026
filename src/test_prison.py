@@ -35,7 +35,20 @@ def test_three_turns_in_prison():
   assert board.current_player() is not jordi # next player after he is freed should be mireia
 
 def test_get_out_of_jail_free():
-  ...
+  '''Tests that a get out of jail free card frees the player.'''
+  board = DebugBoard(
+    die_inputs = [
+      (1, 1), (14, 14), (1, -1), (1, -1), (1, -1),
+      (2, 3)
+    ],
+    cards = [5]
+  )
+  jordi = board.players()[0]
+  board.play() # jordi lands on community chest and draws GOOJF
+  # then lands on go to jail
+  # everybody stalls for a turn
+  # then its jordis turn. he shouldve used the GOOJF, got out and rolled
+  assert not jordi.is_in_prison()
 
 def test_roll_doubles_to_get_out_of_jail():
   '''Tests that getting out of jail with doubles works properly.'''

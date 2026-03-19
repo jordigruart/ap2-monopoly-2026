@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Optional
 import const, aitools
 
 if TYPE_CHECKING:
@@ -16,12 +16,18 @@ class Tile:
   _position: int
   _name: str
 
-  def __init__(self, board: Board, position: int, name: str):
+  def __init__(self, board: Board, position: int, name: str, type: str):
+    '''Initializes constants shared among all tiles:
+     - board is the Board instance the tile belongs to
+     - position is its position on the board
+     - name is tile name
+     - type is tile type
+    '''
     self._board = board
     self._position = position
     self._name = name
 
-    self._tile_type = 'default'
+    self._tile_type = type
 
   def __str__(self) -> str: return self.name()
 
@@ -41,9 +47,13 @@ class Tile:
     print(f'{player} has landed on {self}')
 
 class Special(Tile):
-  def __init__(self, **kwargs: Any):
-    super().__init__(**kwargs)
-    self._tile_type = 'special'
+  '''Class for special tiles (Go, Free Parking, Jail, Go to Jail)'''
+  def __init__(self, board: Board, position: int, name: str, type: str,
+    description: str):
+    '''See Tile's __init__ method for board, position, name, type
+    - description is a description of the tile's action
+    '''
+    super().__init__(board, position, name, type)
   
   def land_on(self, player: Player):
     super().land_on(player)
@@ -53,10 +63,12 @@ class Special(Tile):
 class Tax(Tile):
   _amount: int
 
-  def __init__(self, amount: int, **kwargs: Any):
-    super().__init__(**kwargs)
+  def __init__(self, board: Board, position: int, name: str, type: str,
+    amount: int, description: str):
+    '''See Tile's __init__ method for board, position, name, type
+     - amount is amount to be charged when landed on'''
+    super().__init__(board, position, name, type)
     self._amount = amount
-    self._tile_type = 'tax'
   
   def land_on(self, player: Player):
     super().land_on(player)
@@ -66,14 +78,19 @@ class Tax(Tile):
 class DeckTile(Tile):
   _deck: Deck
 
-  def __init__(self, tile_type: Literal['chance'] | Literal['community_chest'], **kwargs: Any):
-    super().__init__(**kwargs)
-    self._tile_type = tile_type
-  
+  def __init__(self, board: Board, position: int, name: str, type: str,
+    description: str): 
+    '''See Tile's __init__ method for board, position, name, type
+    - description is a description of the tile's action
+    '''
+    super().__init__(board, position, name, type)
+
   def deck(self):
+    '''Returns the Deck object that is drawn from when this line is landed on.'''
     return (
       self.board().chance_deck() if self._tile_type == 'chance'
-      else self.board().community_deck())
+      else self.board().community_deck()
+    )
 
   def land_on(self, player: Player):
     super().land_on(player)
@@ -87,14 +104,23 @@ class Property(Tile):
   _price: int;  _mortgage: int
   _owner: Optional[Player]; _is_mortgaged: bool
 
-  def __init__(self, board: Board, position: int, name: str,
+  def __init__(self, board: Board, position: int, name: str, type: str,
     price: int, mortgage: int):
-    super().__init__(board, position, name)
-    self._tile_type = 'property'
+    '''See Tile's __init__ method for board, position, name, type
+     - price is the price of the property
+     - mortgage is the bonus granted for mortgaging the property'''
+    super().__init__(board, position, name, type)
 
     self._price = price; self._mortgage = mortgage
     self._owner = None; self._is_mortgaged = False
 
+  @property
+  def owner(self) -> Optional[Player]:
+    '''Owner of the property, or None if it is not owned.'''
+    return self._owner
+  @owner.setter
+  def owner(self, newval: Player) -> None:
+    self._owner = newval
   def price(self) -> int: return self._price
   def is_mortgaged(self) -> bool: return self._is_mortgaged
   def mortgage_bonus(self) -> int:
@@ -103,9 +129,6 @@ class Property(Tile):
   def demortgage_fee(self) -> int:
     '''Returns the amount to be paid to demortgage the property.'''
     return int(self.mortgage_bonus() * const.MORTGAGE_INTEREST_RATE)
-  def owner(self) -> Optional[Player]:
-    '''Returns the owner of the property, or None if it is not owned.'''
-    return self._owner
   def rent(self) -> int:
     '''Returns the rent to be charged when this tile is landed on, considering
     the current state of the board.'''
@@ -122,13 +145,13 @@ class Property(Tile):
     Board-drawing: This function draws the board if the player is charged rent
     or buys the property.'''
     super().land_on(player)
-    if self.owner() is not None:
+    if self.owner is not None:
       if not self.is_mortgaged() and not player.owns(self):
         rent = int(rent_multiplier * self.rent())
 
-        player.deduct(rent, self.owner())
-        self.owner().entrust(rent) # type: ignore
-        print(f'{player} has paid ${rent} to {self.owner()}')
+        self.owner.entrust(rent) # type: ignore
+        player.deduct(rent, self.owner)
+        print(f'{player} has paid ${rent} to {self.owner}')
         self.board().draw()
 
     else: aitools.prompt_buy(player, self)
@@ -138,20 +161,20 @@ class Property(Tile):
     bonus, which is half its price by definition.
         
     Board-drawing: This function draws the board.'''
-    assert self.owner() is not None
+    assert self.owner is not None
     assert not self.is_mortgaged()
     self._is_mortgaged = True
-    self.owner().entrust(self._mortgage) # type: ignore
+    self.owner.entrust(self._mortgage) # type: ignore
 
-    print(f'{self.owner()} has mortgaged {self}')
+    print(f'{self.owner} has mortgaged {self}')
     self.board().draw()
   
   def demortgage(self):
     '''Demortgages tile and deducts 110% of its mortgage fee from its owner.'''
-    assert self.owner() is not None
+    assert self.owner is not None
     assert self.is_mortgaged()
     self._is_mortgaged = False
-    self.owner().deduct(int(self._mortgage * const.MORTGAGE_INTEREST_RATE)) # type: ignore
+    self.owner.deduct(int(self._mortgage * const.MORTGAGE_INTEREST_RATE)) # type: ignore
 
     self.board().draw()
 
@@ -168,28 +191,36 @@ class Street(Property):
 
   _house_cost: int;  _hotel_cost: int
 
-  def __init__(self, board: Board, position: int, name: str,
+  def __init__(self, board: Board, position: int, name: str, type: str,
     price: int, mortgage: int,
 
     color: str,
 
-    starting_rent: int, rent_with_color_set: int, rent_with_1_house: int,
-    rent_with_2_houses: int, rent_with_3_houses: int, rent_with_4_houses: int,
-    rent_with_hotel: int,
+    rent: int, rentWithColorSet: int, rentWith1House: int,
+    rentWith2Houses: int, rentWith3Houses: int, rentWith4Houses: int,
+    rentWithHotel: int,
 
-    house_cost: int, hotel_cost: int
+    houseCost: int, hotelCost: int
     ):
-    super().__init__(board, position, name, price, mortgage)
-    self._tile_type = 'property'
+    '''See Property class for board, position, name, type, price, mortgage
+     - color is the tile's color
+     - rent is the rent charged by default
+     - rentWithColorSet is rent charged when the color set is owned by one player
+     - rentWith1House, rentWith2Houses, ...
+     - rentWithHotel
+     - houseCost and hotelCost are the amount to be paid to build'''
+    
+    super().__init__(board, position, name, type,
+      price, mortgage)
 
     self._color = color
 
-    self._starting_rent = starting_rent
-    self._color_set_rents = [rent_with_color_set] + [rent_with_1_house, rent_with_2_houses,
-      rent_with_3_houses, rent_with_4_houses]
-    self._rent_with_hotel = rent_with_hotel 
+    self._starting_rent = rent
+    self._color_set_rents = [rentWithColorSet] + [rentWith1House, rentWith2Houses,
+      rentWith3Houses, rentWith4Houses]
+    self._rent_with_hotel = rentWithHotel 
 
-    self._house_cost = house_cost; self._hotel_cost = hotel_cost 
+    self._house_cost = houseCost; self._hotel_cost = hotelCost 
 
     self._houses = 0 # amount of houses on property; 5 with hotel
     self._has_hotel = False
@@ -217,10 +248,10 @@ class Street(Property):
     return self.building_cost()//2
 
   def rent(self) -> int:
-    if self.owner() is None: return 0
+    if self.owner is None: return 0
     if self.is_mortgaged(): return 0
     if self.has_hotel(): return self._rent_with_hotel
-    if self.owner().owns_color(self.color): # type: ignore
+    if self.owner.owns_color(self.color): # type: ignore
       return self._color_set_rents[self._houses] # where item i is rent with i houses
     else: return self._starting_rent
 
@@ -239,19 +270,19 @@ class Street(Property):
     
     Board-drawing: This function draws the board.'''
 
-    assert self.owner() is not None
-    assert self.owner().owns_color(self.color) # type: ignore
+    assert self.owner is not None
+    assert self.owner.owns_color(self.color) # type: ignore
     assert all(not property.is_mortgaged() for property in self.color_set())
     assert not self.has_hotel()
-    assert all(property.houses() >= self.houses() for property in self.color_set())
-    assert self.owner().balance() >= self.building_cost() # type: ignore
+    assert all(property.houses() >= self.houses() or property.has_hotel() for property in self.color_set())
+    assert self.owner.balance() >= self.building_cost() # type: ignore
     
     if self.houses() == 4:
       self._has_hotel = True
     self._houses += 1
-    self.owner().deduct(self.building_cost()) # type: ignore
+    self.owner.deduct(self.building_cost()) # type: ignore
     self.board().draw()
-    print(f'{self.owner()} has built on {self}. The tile now has',
+    print(f'{self.owner} has built on {self}. The tile now has',
       'an hotel' if self.has_hotel() else (str(self._houses) + ' houses.'))
 
   def sell(self):
@@ -265,8 +296,8 @@ class Street(Property):
     Cannot sell if there are no houses on the tile.
     
     Board-drawing: This function draws the board.'''
-    assert self.owner()
-    assert self.owner().owns_color(self.color) # type: ignore
+    assert self.owner
+    assert self.owner.owns_color(self.color) # type: ignore
     assert self.houses() > 0, 'No houses left to sell'
     assert all(
       property.houses() <= self.houses() for property in self.color_set() if not property.is_mortgaged()
@@ -274,9 +305,9 @@ class Street(Property):
     if self._has_hotel:
       self._has_hotel = False
     self._houses -= 1
-    self.owner().entrust(self.selling_bonus()) # type: ignore
+    self.owner.entrust(self.selling_bonus()) # type: ignore
     self.board().draw()
-    print(f'{self.owner()} has sold on {self}. The tile now has {self._houses} houses.')
+    print(f'{self.owner} has sold on {self}. The tile now has {self._houses} houses.')
 
   def mortgage(self):
     '''Mortgages tile, granting its owner the tile's corresponding mortgage
@@ -297,88 +328,64 @@ class Street(Property):
 class Station(Property):
   _rents: list[int] # contains rent with 1 station, rent with 2 stations, etc...
 
-  def __init__(self, board: Board, position: int, name: str,
+  def __init__(self, board: Board, position: int, name: str, type: str,
     price: int, mortgage: int,
 
-    starting_rent: int, rent_with_2_stations: int, rent_with_3_stations: int,
-    rent_with_4_stations: int,
+    rent: int, rentWith2Stations: int, rentWith3Stations: int,
+    rentWith4Stations: int,
   ):
-    super().__init__(board, position, name, price, mortgage)
+    '''See Property class for board, position, name, type, price, mortgage
+     - rent is the rent to be charged with only one station owned
+     - rentWith2Stations, rentWith3Stations, ...'''
+    super().__init__(board, position, name, type, price, mortgage)
     
-    self._rents = [0, starting_rent, rent_with_2_stations, rent_with_3_stations, rent_with_4_stations]
+    self._rents = [
+      0, rent, rentWith2Stations, rentWith3Stations, rentWith4Stations
+    ]
     
     self._tile_type = 'station'
   
   def rent(self) -> int:
-    if self.owner() is None: return 0
-    return self._rents[self.owner().station_count()] # type: ignore
+    if self.owner is None: return 0
+    return self._rents[self.owner.station_count()] # type: ignore
 
 class Utility(Property):
+  '''Utility tile. Ownable tile. Player must own'''
   _default_multiplier: int
   _multiplier_with_both: int
 
-  def __init__(self, board: Board, position: int, name: str,
+  def __init__(self, board: Board, position: int, name: str, type: str,
     price: int, mortgage: int,
-    default_multiplier: int, multiplier_with_both: int
-  ):
-    super().__init__(board, position, name, price, mortgage)
 
-    self._default_multiplier = default_multiplier
-    self._multiplier_with_both = multiplier_with_both
-    
-    self._tile_type = 'utility'
-  
+    rentMultiplier: int, rentMultiplierWithBoth: int, description: str
+  ):
+    '''See Property class for board, position, name, type, price, mortgage
+     - rentMultiplier is the amount
+     - rentWith2Stations, rentWith3Stations, ...
+     - description is a description of the tile's actions.'''
+    super().__init__(board, position, name, type, price, mortgage)
+
+    self._default_multiplier = rentMultiplier
+    self._multiplier_with_both = rentMultiplierWithBoth
+      
   def rent(self) -> int:
-    if self.owner() is None: return 0
+    if self.owner is None: return 0
 
     self.board().throw_dice()
     return sum(self.board().dice()) * (
-      self._default_multiplier if self.owner().utility_count() == 1 else self._multiplier_with_both # type: ignore
+      self._default_multiplier if self.owner.utility_count() == 1 else self._multiplier_with_both # type: ignore
       )
 
-def build_tile(board: Board, data: dict[str, Any]) -> Tile:
-  tile_type = data['type']
+TILE_TYPES: dict[str, type[Tile]] = {
+  'property': Street,
+  'station': Station,
+  'utility': Utility,
+  'chance': DeckTile,
+  'community_chest': DeckTile,
+  'tax': Tax
+}
 
-  match tile_type:
-    case 'property': return Street(
-      board, data['position'], data['name'], data['price'], data['mortgage'],
-      data['color'], data['rent'], data['rentWithColorSet'],
-      data['rentWith1House'], data['rentWith2Houses'], data['rentWith3Houses'],
-      data['rentWith4Houses'], data['rentWithHotel'], data['houseCost'],
-      data['hotelCost']
-    )
-
-    case 'station': return Station(
-      board, data['position'], data['name'], data['price'], data['mortgage'],
-      data['rent'], data['rentWith2Stations'], data['rentWith3Stations'],
-      data['rentWith4Stations'], 
-    )
-
-    case 'utility': return Utility(
-      board, data['position'], data['name'], data['price'], data['mortgage'],
-      data['rentMultiplier'], data['rentMultiplierWithBoth']
-    )
-
-    case 'chance' | 'community_chest': return DeckTile(
-      board = board, position = data['position'], name = data['name'], tile_type = tile_type
-    )
-
-    case 'tax': return Tax(
-      board = board, position = data['position'], name = data['name'], amount = data['amount']
-    )
-
-    case _: return Special(
-      board = board, position = data['position'], name = data['name']
-    )
-
-'''
-def build_tile_potser(board: Board, **kwargs: Any) -> Tile:
-  # Preguntar a en Jordi Petit si això és bona pràctica
-  match kwargs['type']:
-    case 'property': type = Street
-    case 'utility': type = Utility
-    ...
-    case _: type = Special
-
-  return type.__init__(board, **kwargs)
-'''
+def build_tile(board: Board, **data: Any) -> Tile:
+  '''Returns a tile of valid type. Preguntar a en jordi petit com és que s'especifica'''
+  tile_type = TILE_TYPES.get(data['type'], Special)
+  return tile_type(board, **data)
