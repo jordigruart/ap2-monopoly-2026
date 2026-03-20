@@ -23,6 +23,7 @@ class Tile:
      - name is tile name
      - type is tile type
     '''
+    # type argument is kept because draw calls it to tell what kind of tile to draw
     self._board = board
     self._position = position
     self._name = name

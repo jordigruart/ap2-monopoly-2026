@@ -3,7 +3,10 @@ from board import DebugBoard
 import const
 
 def test_elimination_tax() -> DebugBoard:
-  '''Tests that a player can be eliminated when landing on a tax tile.'''
+  '''Tests that a player can be eliminated when landing on a tax tile.
+  
+  Return value: Jordi eliminated, Mireia's turn. Pending rice rolls: 
+  (-1, 1), (-1, 1), (-1, 1), (4, 0)'''
   board = DebugBoard(
     die_inputs = [(4, 0), (-1, 1), (-1, 1), (-1, 1), (4, 0)]
   )
@@ -15,13 +18,13 @@ def test_elimination_tax() -> DebugBoard:
 
 def test_eliminated_player_doesnt_play():
   '''Tests that players who have been eliminated cannot play at all.'''
-  board = test_elimination_tax()
-  jordi = board.players()[0]
+  board = test_elimination_tax() #see doc string for details
+  mireia = board.players()[1]
   board.run(3) # mireia, arnau and marta have a go
-  board.run(1) # mireia shouldve landed on tax
-  assert board.current_player() != jordi
-  # jordi shouldnt have been charged anything; it shouldve been mireia
-  assert jordi.balance() == -100 
+  board.play() # mireia -- and not jordi -- shouldve landed on tax
+  assert mireia.position() == 4
+  # tile logic shouldve been run on mireia and not jordi
+  assert mireia.balance() == const.START_MONEY - 200
 
 def test_properties_reset():
   '''Tests that unmortgaged properties are reset when a player is eliminated.'''
@@ -29,11 +32,12 @@ def test_properties_reset():
 
   # jordi's turn
   # he owns green and there are some houses on every green street
-  board = test_building_orderly()
+  board = test_building_orderly() #see doc string for details
   jordi = board.players()[0]
   jordi.__setattr__('_money', 100)
   board.play() # all players stall until jordi lands on income tax and is eliminated
 
+  # properties shouldve been properly reset
   assert all(not property.owner and property.houses() == 0         
     for property in board.color_set('green')) 
 
@@ -42,10 +46,10 @@ def test_mortgages_given_to_creditor():
   an eliminated player.'''
   from test_player_ai import test_ai_sells_properly_from_full_set
   board = test_ai_sells_properly_from_full_set()
-  jordi, mireia = board.players()[:2]
   # all players at GO
-  # all greens mortgaged and under jordi's property
+  # all greens are mortgaged and under jordi's property
   # mireia's turn
+  jordi, mireia = board.players()[:2]
 
   jordi.__setattr__('_money', 1)
 
@@ -61,6 +65,9 @@ def test_bankruptcy_when_keeping_mortgage():
   # behaviour similar to last test (test_mortgages_given_to_creditor)
   from test_player_ai import test_ai_sells_properly_from_full_set
   board = test_ai_sells_properly_from_full_set()
+  # all players at GO
+  # all greens mortgaged and under jordi's property
+  # mireia's turn
   jordi, mireia = board.players()[:2]
 
   jordi.__setattr__('_money', 1)
@@ -101,8 +108,9 @@ def test_bankruptcy_pay_each_player_card():
   )
   jordi = board.players()[0]
   jordi.__setattr__('_money', 50)
-  board.play()
+  board.play() # jordi lands on chance and draws Chairman of the board
   assert jordi.is_eliminated()
+  
   assert all(player.balance() == const.START_MONEY + 50 for player in board.players()[1:])
   # everybody else still shouldve gotten paid
 

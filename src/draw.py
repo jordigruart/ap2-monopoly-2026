@@ -4,9 +4,8 @@ from typing import Any, TYPE_CHECKING
 import const
 import drawsvg as dw
 
-if TYPE_CHECKING:
-  from tile import Tile, Property
-  from board import Board
+from tile import Tile, Property
+if TYPE_CHECKING: from board import Board
 
 # Board dimensions: 1000x1000 total; player info in four quadrants at center
 BOARD_SIZE = 1000
@@ -231,7 +230,7 @@ def draw_board_tiles(d: dw.Drawing, board: Board, show_number: bool = False) -> 
             )
         # Owned properties: show owner number or piece in white at bottom right
         if tile.tile_type() in ("property", "station", "utility"):
-            tile: Property
+            assert isinstance(tile, Property)
             owner = tile.owner
             if owner is not None:
                 if show_number:

@@ -5,7 +5,10 @@ from board import DebugBoard
 if TYPE_CHECKING: from tile import Street
 
 def test_building_orderly() -> DebugBoard:
-  '''Test whether building in order works.'''
+  '''Test whether building in order works.
+  
+  Return value: Green under Jordi's ownership and with some buildings. Mireia's
+  turn. Pending rolls: (-1, 1), (-1, 1), (-1, 1), (0, 4)'''
   board = DebugBoard(
     die_inputs = [(-1, 1), (-1, 1), (-1, 1), (-1, 1), (0, 4)]
   )
@@ -26,10 +29,11 @@ def test_building_orderly() -> DebugBoard:
 
 def test_selling_orderly():
   '''Tests that selling in order works.'''
-  board = test_building_orderly()
+  board = test_building_orderly() # see doc strings for details
   regent: Street; oxford: Street; bond: Street
   regent, oxford, tmp, bond = board.tiles()[31:35] # type: ignore
 
+  # regent: 2 houses; bond: 3 houses; oxford: 3 houses
   oxford.sell(); bond.sell(); regent.sell(); bond.sell()
   oxford.sell(); oxford.sell(); bond.sell(); regent.sell()
 

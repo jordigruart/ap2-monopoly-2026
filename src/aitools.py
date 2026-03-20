@@ -45,9 +45,9 @@ def _run_selling_actions(player: Player) -> None:
   and every building sold.'''
   # sell buildings
   for color in filter(player.owns_color, const.COLORS):
-    color = player.board().color_set(color)
-    for property in _selling_order(color):
-      property.sell()
+    color_set = player.board().color_set(color)
+    for street in _selling_order(color_set):
+      street.sell()
       if player.balance() >= const.SPENDING_THRESHOLD: return
   
   # if still critical, mortgage until not

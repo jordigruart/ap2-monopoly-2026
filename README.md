@@ -5,24 +5,24 @@ En aquesta pràcitca m'ha estat proposat recrear el clàssic joc de taula del _M
 Les partides es poden visualitzar en un navegador.
 
 ## Instruccions per fer servir el programa
-- Necessites 
+- Cal instal·lar la dependència **drawsvg** amb `python3 -m pip install drawsvg`.
 - Per **simular una partida**, cal executar **`./src/main.py`** (per mitjà de l'intèrprete de Python). És important que s'executi des del directori `.`, que és on es troba aquest README. El programa buidarà el directori `./imgs/` i l'omplirà de noves imatges.
 - Si el programa nota que la partida triga més de 400 torns en finalitzar, l'atura. El programa `./src/seedfinder.py` és un _brute-forcer_ que troba un _seed_ on la partida finalitza en menys de 400 torns. Pren per argument de línia de comanda el valor pel qual comença a buscar. Per fer servir aquest valor en simular una partida, cal editar el valor de la constant `SEED` a `./src/const.py` (valor `1383` per defecte).
 - Per **mostrar les imatges a la pàgina web**, cal executar `./src/slideshow.py`, també des del directori `.` (important!) i passar els arguments adients. A Windows, cal emprar **Powershell**[^1] i executar **aquesta comanda**:
   ```powershell
   python3 src/slideshow.py partida.html (ls imgs *.svg)
   ```
-  > [^1]: Per obrir Powershell, cal introduïr powershell a `Ctrl + R`, o obrirla com a terminal amb el repositori obert a VSCode amb `Ctrl + Ñ`.
+  [^1]: Per obrir Powershell, cal introduïr powershell a `Ctrl + R`, o obrirla com a terminal amb el repositori obert a VSCode amb `Ctrl + Ñ`.
 
   A sistemes basats en UNIX, com ara macOS o Linux, es pot fer servir la següent comanda des de **Bash**:
   ```bash
-  ls imgs | python3 src/slideshow.py partida.html
+  python3 src/slideshow.py partida.html $(ls imgs)
   ```
 
 - Per **mostrar la pàgina web**, obre el fitxer `./partida.html` amb qualsevol navegador.
 - Per **executar els jocs de proves**, executa a la terminal `pytest ./src`, o bé fes servir l'extensió de VSCode vista a classe de laboratori. Les imatges generades en els tests acaben emmagatzemades a `./debug/imgs`.
 
-## Funcionament de la partida
+## Partida
 ### Modificacions i aclaracions respecte les regles oficials
 Generalment, es segueixen [les regles oficials del joc](https://instructions.hasbro.com/api/download/C1009_en-nz_monopoly-classic-game.pdf). S'han pres certes decisions de disseny per facilitar l'implementació que divaguen una mica de les regles oficials:
 - El joc es juga amb un màxim de quatre jugadors.
@@ -38,7 +38,7 @@ Generalment, es segueixen [les regles oficials del joc](https://instructions.has
 - Els jugadors no poden pagar $50 per sortir de la presó, ni els han de pagar per sortir després de tres torns.
 
 A continuació surten redactades algunes regles oficials poc conegudes que he implementat:
-- Quan un jugador **és eliminat**, ha de donar totes les seves propietats al banc, tret de les hipotecades, que ha de donar al jugador que l'ha eliminat. El jugador que rep les propietats hipotecades ha de o bé treure l'hipoteca (pagant el cost de deshipotecar) o assumir-la (pagant un 10% del cost d'hipotecar). El jugador que rep les propietats, per tant, també pot resultar eliminat.
+- Quan un jugador **és eliminat**, ha de donar totes les seves propietats al banc, tret de les hipotecades, que ha de donar al jugador que l'ha eliminat. El jugador que rep les propietats hipotecades ha de o bé treure l'hipoteca (pagant el cost de deshipotecar) o assumir-la (pagant un 10% del cost d'hipotecar). El jugador que rep les propietats, per tant, també pot resultar eliminat. Si el jugador no és eliminat per un altre jugador (una carta, un impost, ...), dona totes les propietats al banc, fins i tot les hipotecades.
 - Hom surt de la presó després de 3 torns. Aquests torns es compten de la següent manera:
   - no es registra un torn en presó fins que el jugador acaba totes les accions del torn. El jugador és lliurat immediatament després d'acabar el seu tercer torn, i no al començar el quart.
   - el torn on el jugador va a presó no es compta com a torn passat en presó.
@@ -56,7 +56,7 @@ L'estratègia dels jugadors gira entorn a una quantitat límit  de **$40**:
 
 Si bé el límit és baix, les partides s'allarguen considerablement si esdevé més alt. Serveix com a límit simbòlic, per tal de que certes accions siguin possibles en una partida.
 
-## Estructura del codi
+## Estructura del codi i de l'execució
 ### Descripció de la base de codi
 El directori `src` conté tots els fitxers que fan funcionar el programa. A continuació es fa un resum dels continguts:
 #### Subdirectori `data`
@@ -73,16 +73,26 @@ El **subdirectori `data`** conté fitxers de tipus _json_ que emmagatzemen infor
   - la funció `build_player(board: Board, **data: Any) -> Player`, que crea instàncies de `Player` a partir d'atributs trets del JSON.
 - **`card.py`** conté:
   - diverses classes que representen diferents tipus de carta. La classe `Card` és la classe base per a totes les cartes.
-  - la funció `build_card(board: Board, **data: Any) -> Card`, que crea instàncies del tipus adient a partir de les d'atributs trets del JSON.
+  - la funció `build_card(board: Board, action: str, **data: Any) -> Card`, que crea instàncies del tipus adient a partir de les d'atributs trets del JSON.
 - **`deck.py`** conté la classe `Deck`, que s'inicialitza a partir d'un path a un JSON que conté l'informació de totes les cartes. La classe té el mòdul `extract`, que retorna una carta aleatòria (sense exhaurir-la).
 - **`board.py`** conté:
   - la classe **`Board`**, que representa el tauler de joc complert i gestiona el progrés dels torns i de la partida. Durant la partida es crea una única instància d'aquesta clase, que tot `Tile`, `Player`, `Deck` i `Card` manté guardat en les seves variables internes.
-  - la classe **`DebugBoard`**, que hereta `Board` però pren per arguments un vector de **tirades de daus** i de **cartes** que fa servir en comptes de triar aleatòriament. Els mòduls de proves la fan servir per simular partides.
+  - la classe **`DebugBoard`**, que hereta `Board` però pren per arguments un vector de **tirades de daus** i de **cartes** que fa servir en comptes de triar aleatòriament. Els jocs de proves la fan servir per simular partides.
 - **`aitools.py`** conté funcions que decideixen què ha de fer un jugador davant una decisió, tot basant-se en l'estratègia ja descrita (Funcionament de la partida: Estratègia dels jugadors).
 
-### Dependències
+#### Funcions auxiliars
 - **`draw.py`** conté la funcionalitat de dibuixar el tauler. A destacar és la funció `draw(board: Board, svg_path: str = const.IMAGE_PATH) -> None`, que dibuixa el tauler i el guarda en el _path_ especificat.
-- **`drawsvg.py`** 
+- **`drawsvg.pyi`** conté _type hints_ per la dependència `drawsvg`.
+- **`seedfinder.py`** troba un _seed_ que genera una partida de menys de 400 torns de durada.
+
+#### Jocs de proves
+- **`test_building_and_selling.py`** prova les normes d'edificació i desedificació.
+- **`test_cards.py`** prova les accions de les cartes
+- **`test_elimination.py`** prova la lògica d'eliminació, i que s'apliqui quan cal.
+- **`test_movement.py`** prova la lògica de moviment.
+- **`test_player_ai`** prova l'estratègia de jugador.
+- **`test_prison.py`** prova la lògica de presó.
+- **`test_tiles.py`** prova la lògica que s'executa en aterrar en una casella.
 
 ### Dibuix i sortida a la terminal
 El tauler es dibuixa **diverses vegades** en un mateix torn. Concretament, el tauler es dibuixa quan un jugador:
@@ -108,6 +118,3 @@ El mètode cridat per dibuixar el tauler és `Board.draw()` dins de la classe `B
 > El tauler es dibuixa des de punts molt diversos en l'execució (vegi la llista anterior). Hi ha mètodes tant en `Player` com en `Tile` com en `Card` que volen dibuixar el tauler. La instància d'aquesta classe, llavors, ha d'estar en tots aquests mètodes. Com que tots tenen una instància de `Board`, em va semblar adequat prendre la decisió de disseny de **tenir el mètode a `Board`**.
 > 
 > El mètode `Board.draw()` decideix el path on dibuixar segons el path donat al objecte `Board` quan s'inicialitza. Aquest path és, per defecte, `./imgs` per partides normals i `./debug/imgs` per partides de prova o pel _brute-forcer_.
-
-# Autors
-Jordi Gruart, Jordi Petit

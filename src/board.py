@@ -146,6 +146,7 @@ class Board:
     current_tile.land_on(player)
   
   def _play_turn(self):
+    '''Plays a single turn for self.current_player().'''
     current_player = self.current_player()
     if current_player.is_eliminated():
       self._make_way_for_next_player()
@@ -211,7 +212,7 @@ class DebugBoard(Board):
     return True
 
   def run(self, turns: int) -> None:
-    '''Runs game for the specified number of turns.'''
+    '''Runs game for the specified number of turns, then stops.'''
     for _ in range(turns):
       try: self._play_turn()
       except const.EndTurn:
